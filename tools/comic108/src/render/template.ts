@@ -250,7 +250,9 @@ function boothHtml(e) {
   if (!bs.length) return '<div class="booth"><span class="b unknown">配置 未取得</span></div>';
   return '<div class="booth">' + bs.map(b =>
     '<span class="b"' + (b.area ? ' data-area="' + esc(b.area) + '"' : '') + '>' + esc(b.display) + '</span>' +
-    (b.confidence === 'low' ? '<span class="flag" title="一部しか読み取れていません">要確認</span>' : '')
+    (b.inherited
+      ? '<span class="flag" title="このツイート自体には配置が書かれておらず、同じアカウントの別ツイートから引き継ぎました">別ツイートより</span>'
+      : b.confidence === 'low' ? '<span class="flag" title="一部しか読み取れていません">要確認</span>' : '')
   ).join('') + '</div>';
 }
 

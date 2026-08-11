@@ -31,10 +31,15 @@ const AREAS: Area[] = ['東', '西', '南'];
  * 全局替换会把 ホール 打成 ホ-ル, 所以只在 SEP 字符类里就地接受它。
  */
 export function normalize(text: string): string {
-    return text
-        .normalize('NFKC')
-        .replace(/[‐‑–—]/g, '-')
-        .replace(/[　\t]+/g, ' ');
+    return (
+        text
+            // 実データで「み<U+AD><U+AD>-05b」のように不可視文字が挟まっている例があった。
+            // コピペで紛れ込むもので、見た目には出ないのに解析だけ壊すので最初に落とす
+            .replace(/[­​-‍⁠﻿]/g, '')
+            .normalize('NFKC')
+            .replace(/[‐‑–—]/g, '-')
+            .replace(/[　\t]+/g, ' ')
+    );
 }
 
 interface DayMarker {
@@ -101,6 +106,8 @@ function formatDisplay(b: Omit<Booth, 'display'>): string {
         if (b.ab) space += b.ab;
     } else if (b.hall) {
         space += 'ホール';
+    } else if (b.area) {
+        space += '地区';
     }
     if (space) parts.push(space);
 
@@ -179,6 +186,26 @@ export function parseBooths(input: string): Booth[] {
         );
     }
 
+    // D: 「南館」のような棟の呼び方。ブロックは分からないが地区の絞り込みには使える
+    const reD = /([東西南])館/g;
+    for (const m of text.matchAll(reD)) {
+        if (m.index === undefined) continue;
+        if (overlaps(spans, m.index, m.index + m[0].length)) continue;
+        push(
+            {
+                day: pickDay(markers, m.index),
+                area: m[1] as Area,
+                hall: null,
+                block: null,
+                number: null,
+                ab: null,
+                raw: m[0],
+                confidence: 'low',
+            },
+            { start: m.index, end: m.index + m[0].length },
+        );
+    }
+
     // C: 只有 地区 + ホール, 没有具体 ブロック
     const reC = /([東西南])\s*([0-9]{1,2}(?:\s*[-~～ー]\s*[0-9]{1,2})?)?\s*ホール/g;
     for (const m of text.matchAll(reC)) {
@@ -200,7 +227,40 @@ export function parseBooths(input: string): Booth[] {
         );
     }
 
-    return dedupe(booths);
+    return mergeHallOnly(dedupe(booths));
+}
+
+/**
+ * ホールだけの記述を、同じスペースを指す完全な配置に畳み込む。
+ *
+ * 実データでは配置とホールを別々に書くのが普通:
+ *   「南1ホール【L-12b】」            —— ホールが先、番号が括弧の中
+ *   「西地区 "か"ブロック-28a (西2ホール)」—— ホールが後ろに補足で付く
+ * これを 2 件として出すと、同じサークルが 2 箇所にいるように見えてしまう。
+ *
+ * 地区が一致するもの同士を畳み、地区が読めていない配置は
+ * ホール記述が 1 つだけの時に限ってそこから地区を引き継ぐ。
+ */
+function mergeHallOnly(booths: Booth[]): Booth[] {
+    const full = booths.filter((b) => b.block !== null);
+    const hallOnly = booths.filter((b) => b.block === null);
+    if (full.length === 0 || hallOnly.length === 0) return booths;
+
+    const consumed = new Set<Booth>();
+
+    for (const f of full) {
+        let source = hallOnly.find((h) => h.area && f.area && h.area === f.area && !consumed.has(h));
+        if (!source && !f.area && hallOnly.length === 1) source = hallOnly[0];
+        if (!source) continue;
+
+        if (!f.area) f.area = source.area;
+        if (!f.hall) f.hall = source.hall;
+        if (f.day === null) f.day = source.day;
+        f.display = formatDisplay(f);
+        consumed.add(source);
+    }
+
+    return booths.filter((b) => !consumed.has(b));
 }
 
 function overlaps(spans: Span[], start: number, end: number): boolean {

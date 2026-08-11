@@ -74,6 +74,27 @@ check('長文から複数の配置を拾う', (long?.booths.length ?? 0) >= 2, l
 check('全角ホール+片假名ブロック', long?.booths.some((b) => b.block === 'ア' && b.hall === '4'), long?.booths);
 check('新刊と既刊の両方', long?.works.length === 2, long?.works);
 
+// --- アカウント単位の配置引き継ぎ ---
+// 「お品書き公開しました」だけで配置が本文に無いツイートは実データで最多の取りこぼし。
+// 同じ人が別ツイートで配置を書いていれば、そこから借りる。
+const withSibling = [
+    ...tweets,
+    {
+        id: '2001', text: 'お品書き公開しました！ぜひお立ち寄りください #C108',
+        screenName: 'sample_circle', displayName: 'さんぷる工房', createdAt: '2026-08-10T10:00:00.000Z',
+        hashtags: ['C108'], media: [{ url: 'https://pbs.twimg.com/media/x.jpg', type: 'photo' as const }],
+        url: 'https://x.com/sample_circle/status/2001', isRetweet: false,
+    },
+];
+const inheritedSet = buildDataset(withSibling, {}, 1);
+const borrowed = inheritedSet.circles.find((c) => c.tweetId === '2001');
+check('配置の無いツイートが同じアカウントから引き継ぐ', borrowed?.booths[0]?.display === '2日目 東A-12b', borrowed?.booths);
+check('引き継いだ配置は inherited が立つ', borrowed?.booths[0]?.inherited === true);
+check('引き継いだ配置の確度は low', borrowed?.booths[0]?.confidence === 'low');
+check('引き継ぎ件数が stats に出る', inheritedSet.stats.boothsInherited === 1, inheritedSet.stats.boothsInherited);
+check('自前で配置があるツイートは上書きされない',
+    inheritedSet.circles.find((c) => c.tweetId === '1001')?.booths[0]?.inherited === undefined);
+
 // --- overrides ---
 const patched = buildDataset(tweets, { '1005': { circleName: '手動で直した名前' }, '@rt_sample': { drop: true } }, 1);
 check('overrides が適用される', patched.stats.overridesApplied >= 1, patched.stats.overridesApplied);

@@ -93,6 +93,7 @@ console.log(`
       circleish.length ? ` (${Math.round(((circleish.length - missingBooth.length) / circleish.length) * 100)}%)` : ''
   }
   確度 low      ${lowConfidence.length} 件
+  画像のみ      ${missingBooth.filter((r) => r.tweet.media.length > 0).length} 件 (本文に配置が無く、お品書き画像だけ)
 `);
 
 const dump = (title: string, list: Row[], limit = 25) => {

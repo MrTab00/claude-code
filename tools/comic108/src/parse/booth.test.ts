@@ -78,6 +78,37 @@ const cases: Case[] = [
         expect: { area: '東', block: 'A', number: 12, ab: 'b' },
         count: 1,
     },
+    // --- 以下は実際に採集したツイートから起こしたケース ---
+    {
+        name: '実データ: ホールが先、番号が【】の中 南1ホール【L-12b】',
+        input: '☀️夏コミお品書き☀️ #c108 南1ホール【L-12b】「可愛いっ子girls」にいます！',
+        expect: { area: '南', hall: '1', block: 'L', number: 12, ab: 'b', confidence: 'high' },
+        count: 1,
+    },
+    {
+        name: '実データ: ホールが後ろに補足 西地区"か"ブロック-28a (西2ホール)',
+        input: '日曜日 西地区 “か”ブロック－28a (西２ホール)',
+        expect: { day: 2, area: '西', hall: '2', block: 'か', number: 28, ab: 'a' },
+        count: 1,
+    },
+    {
+        name: '実データ: 不可視文字(U+00AD)が挟まっていても読める',
+        input: '🍀1日目(土) 西1ホール み­­-05b 🍀サークル：香月堂',
+        expect: { day: 1, area: '西', hall: '1', block: 'み', number: 5, ab: 'b', confidence: 'high' },
+        count: 1,
+    },
+    {
+        name: '実データ: 「南館」は地区だけの低確度',
+        input: '今回は南館の配置となっていますので空調も良く効いて涼しいハズ!',
+        expect: { area: '南', block: null, hall: null, confidence: 'low' },
+        count: 1,
+    },
+    {
+        name: '別々の地区は畳まない(東の配置と南の企業ブース)',
+        input: '1日目 東４ホール ア-12ab にて頒布。2日目 南1-2ホール の企業ブースにも顔を出します',
+        expect: { day: 1, area: '東', hall: '4', block: 'ア', number: 12, ab: 'ab' },
+        count: 2,
+    },
     {
         name: '配置を含まない文は 0 件',
         input: '明日はコミケです！よろしくお願いします',

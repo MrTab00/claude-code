@@ -65,6 +65,8 @@ export interface Booth {
     /** 归一化后的展示串, 如 "2日目 東A-12b" */
     display: string;
     confidence: Confidence;
+    /** 这条推文本身没写配置, 是从同一账号的其他推文借来的 */
+    inherited?: boolean;
 }
 
 /** 社团 / サークル 条目 */
@@ -140,6 +142,8 @@ export interface Dataset {
         cosplayers: number;
         unclassified: number;
         overridesApplied: number;
+        /** 同一账号的其他推文里借来的配置数 */
+        boothsInherited: number;
     };
     circles: Circle[];
     cosplayers: Cosplayer[];

@@ -67,6 +67,33 @@ function applyOverrides<T extends Entry>(entries: T[], overrides: Overrides): { 
     return { entries: out, applied };
 }
 
+/**
+ * 同じアカウントの別ツイートから配置を引き継ぐ。
+ *
+ * 実データで一番多い取りこぼしは「お品書き公開しました！」だけのツイート —— 配置番号は
+ * 画像の中にあって本文には無い。ただ同じ人が別のツイートでは本文に配置を書いていることが多いので、
+ * アカウント単位で拾い直すと当たりが大きく増える。
+ * 借り物なので確度は low に落とし、inherited を立てて UI で区別できるようにする。
+ */
+function inheritBoothsByAccount(circles: Circle[]): number {
+    const known = new Map<string, Circle['booths']>();
+    for (const c of circles) {
+        if (c.booths.some((b) => b.confidence === 'high') && !known.has(c.screenName)) {
+            known.set(c.screenName, c.booths);
+        }
+    }
+
+    let applied = 0;
+    for (const c of circles) {
+        if (c.booths.length > 0) continue;
+        const source = known.get(c.screenName);
+        if (!source) continue;
+        c.booths = source.map((b) => ({ ...b, confidence: 'low' as const, inherited: true }));
+        applied++;
+    }
+    return applied;
+}
+
 /** 推文列表 -> 完整数据集 */
 export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {}, rawCaptures = 0): Dataset {
     const circles: Circle[] = [];
@@ -91,6 +118,8 @@ export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {
         }
     }
 
+    const boothsInherited = inheritBoothsByAccount(circles);
+
     const c = applyOverrides(circles, overrides);
     const p = applyOverrides(cosplayers, overrides);
     const u = applyOverrides(unclassified, overrides);
@@ -105,6 +134,7 @@ export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {
             cosplayers: p.entries.length,
             unclassified: u.entries.length,
             overridesApplied: c.applied + p.applied + u.applied,
+            boothsInherited,
         },
         circles: c.entries,
         cosplayers: p.entries,
