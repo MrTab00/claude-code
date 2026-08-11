@@ -1,0 +1,19 @@
+{
+    "name": "comic108",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "C108 サークル / コスプレイヤー 情報の採集・整理ツール",
+    "scripts": {
+        "collect": "bun run src/cli/collect.ts",
+        "collect:api": "bun run src/cli/collect-api.ts",
+        "parse": "bun run src/cli/parse.ts",
+        "build": "bun run src/cli/build.ts",
+        "all": "bun run collect && bun run parse && bun run build",
+        "demo": "bun run src/cli/demo.ts",
+        "test": "bun run test:booth && bun run test:pipeline && bun run test:collect",
+        "test:booth": "bun run src/parse/booth.test.ts",
+        "test:pipeline": "bun run src/parse/pipeline.test.ts",
+        "test:collect": "bun run src/collect/cdp.test.ts"
+    }
+}

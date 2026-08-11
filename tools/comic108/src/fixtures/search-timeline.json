@@ -1,0 +1,222 @@
+{
+  "data": {
+    "search_by_raw_query": {
+      "search_timeline": {
+        "timeline": {
+          "instructions": [
+            {
+              "type": "TimelineAddEntries",
+              "entries": [
+                {
+                  "entryId": "tweet-1001",
+                  "content": {
+                    "entryType": "TimelineTimelineItem",
+                    "itemContent": {
+                      "itemType": "TimelineTweet",
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "1001",
+                          "core": {
+                            "user_results": {
+                              "result": {
+                                "__typename": "User",
+                                "rest_id": "u1",
+                                "core": { "screen_name": "sample_circle", "name": "さんぷる工房" },
+                                "avatar": { "image_url": "https://pbs.twimg.com/profile_images/u1.jpg" }
+                              }
+                            }
+                          },
+                          "legacy": {
+                            "created_at": "Mon Aug 10 09:00:00 +0000 2026",
+                            "full_text": "【C108お品書き】2日目 東A-12b で参加します！サークル「さんぷる工房」新刊「夏の記録」500円で頒布します https://t.co/abc123",
+                            "lang": "ja",
+                            "entities": {
+                              "hashtags": [{ "text": "C108" }, { "text": "お品書き" }]
+                            },
+                            "extended_entities": {
+                              "media": [
+                                { "media_url_https": "https://pbs.twimg.com/media/shinagaki1.jpg", "type": "photo" },
+                                { "media_url_https": "https://pbs.twimg.com/media/shinagaki2.jpg", "type": "photo" }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "entryId": "tweet-1002",
+                  "content": {
+                    "entryType": "TimelineTimelineItem",
+                    "itemContent": {
+                      "itemType": "TimelineTweet",
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "1002",
+                          "core": {
+                            "user_results": {
+                              "result": {
+                                "__typename": "User",
+                                "rest_id": "u2",
+                                "legacy": {
+                                  "screen_name": "sample_layer",
+                                  "name": "レイヤーさんぷる",
+                                  "profile_image_url_https": "https://pbs.twimg.com/profile_images/u2.jpg"
+                                }
+                              }
+                            }
+                          },
+                          "legacy": {
+                            "created_at": "Mon Aug 10 11:30:00 +0000 2026",
+                            "full_text": "1日目 屋上でコスプレしてました！ #C108 #C108コスプレ #架空アリス #ゆめいろ物語 https://t.co/def456",
+                            "lang": "ja",
+                            "entities": {
+                              "hashtags": [
+                                { "text": "C108" },
+                                { "text": "C108コスプレ" },
+                                { "text": "架空アリス" },
+                                { "text": "ゆめいろ物語" }
+                              ]
+                            },
+                            "extended_entities": {
+                              "media": [{ "media_url_https": "https://pbs.twimg.com/media/cos1.jpg", "type": "photo" }]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "entryId": "tweet-1003",
+                  "content": {
+                    "entryType": "TimelineTimelineItem",
+                    "itemContent": {
+                      "itemType": "TimelineTweet",
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "TweetWithVisibilityResults",
+                          "tweet": {
+                            "__typename": "Tweet",
+                            "rest_id": "1003",
+                            "core": {
+                              "user_results": {
+                                "result": {
+                                  "__typename": "User",
+                                  "core": { "screen_name": "both_sample", "name": "両刀サンプル" }
+                                }
+                              }
+                            },
+                            "legacy": {
+                              "created_at": "Sun Aug 09 04:15:00 +0000 2026",
+                              "full_text": "初日は 西け21a でお品書き頒布、そのあと コスプレエリア でコスプレします！ #C108",
+                              "lang": "ja",
+                              "entities": { "hashtags": [{ "text": "C108" }] },
+                              "extended_entities": {
+                                "media": [{ "media_url_https": "https://pbs.twimg.com/media/both1.jpg", "type": "photo" }]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "entryId": "tweet-1004",
+                  "content": {
+                    "entryType": "TimelineTimelineItem",
+                    "itemContent": {
+                      "itemType": "TimelineTweet",
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "1004",
+                          "core": {
+                            "user_results": {
+                              "result": { "__typename": "User", "core": { "screen_name": "rt_sample", "name": "RTするひと" } }
+                            }
+                          },
+                          "legacy": {
+                            "created_at": "Mon Aug 10 12:00:00 +0000 2026",
+                            "full_text": "RT @sample_circle: 【C108お品書き】2日目 東A-12b で参加します！",
+                            "lang": "ja",
+                            "entities": { "hashtags": [] },
+                            "retweeted_status_result": { "result": { "__typename": "Tweet", "rest_id": "1001" } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "entryId": "tweet-1005",
+                  "content": {
+                    "entryType": "TimelineTimelineItem",
+                    "itemContent": {
+                      "itemType": "TimelineTweet",
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "1005",
+                          "core": {
+                            "user_results": {
+                              "result": { "__typename": "User", "core": { "screen_name": "noise_sample", "name": "ただの感想" } }
+                            }
+                          },
+                          "legacy": {
+                            "created_at": "Mon Aug 10 13:00:00 +0000 2026",
+                            "full_text": "今年も暑いですね。水分補給を忘れずに！ #C108",
+                            "lang": "ja",
+                            "entities": { "hashtags": [{ "text": "C108" }] }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "entryId": "tweet-1006",
+                  "content": {
+                    "entryType": "TimelineTimelineItem",
+                    "itemContent": {
+                      "itemType": "TimelineTweet",
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "1006",
+                          "core": {
+                            "user_results": {
+                              "result": { "__typename": "User", "core": { "screen_name": "long_sample", "name": "長文サンプル" } }
+                            }
+                          },
+                          "note_tweet": {
+                            "note_tweet_results": {
+                              "result": {
+                                "text": "C108の詳細です。1日目 東４ホール ア-12ab にて頒布。新刊「長い夏の話」1000円、既刊「去年の夏」500円。両日ともスペースにいます。2日目 南1-2ホール の企業ブースにも顔を出す予定です。",
+                                "entity_set": { "hashtags": [{ "text": "C108" }, { "text": "新刊" }] }
+                              }
+                            }
+                          },
+                          "legacy": {
+                            "created_at": "Mon Aug 10 08:00:00 +0000 2026",
+                            "full_text": "C108の詳細です。1日目 東４ホール ア-12ab にて頒布。新刊「長い夏の話」1000円、既刊「去年の夏」5…",
+                            "lang": "ja",
+                            "entities": { "hashtags": [{ "text": "C108" }] }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

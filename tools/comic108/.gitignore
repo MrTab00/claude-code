@@ -1,0 +1,10 @@
+# 採集した生データと成果物はコミットしない
+data/raw/
+data/dataset.json
+data/api-tweets.json
+dist/
+
+node_modules/
+
+# 手動補記は各自のもの。テンプレートは manual.example.txt を参照
+data/manual.txt

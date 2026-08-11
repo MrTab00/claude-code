@@ -1,0 +1,202 @@
+/**
+ * CDP 采集: 连接你已经登录的 Chrome, 被动读取页面自己发出的 GraphQL 响应。
+ *
+ * 为什么是被动捕获而不是构造请求:
+ * X 每 2-4 周就会轮换 GraphQL 的 doc_id 并变更 features 参数, 所有自己拼请求的爬虫都会周期性失效。
+ * 而页面前端永远知道怎么正确地请求自己的接口 —— 我们只是把它的响应抄一份下来, 所以不受轮换影响。
+ *
+ * 这里不做任何反检测 / 指纹伪装 / 验证码绕过: 用你自己的登录态, 低频率, 只读公开内容。
+ */
+
+import { appendFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { collect as collectConfig, paths } from '../../config';
+import { collectTweetNodes } from '../parse/extract';
+import type { RawCapture } from '../types';
+import { type CdpConnection, type CdpPage, connectCdp, getResponseBody, openPage } from './cdp-client';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function randomDelay(): number {
+    const [min, max] = collectConfig.scrollDelayMs;
+    return min + Math.random() * (max - min);
+}
+
+function slugify(query: string): string {
+    return query.replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_|_$/g, '').slice(0, 40) || 'query';
+}
+
+/** URL 从 operation 名判断是否是我们要的响应。doc_id 的 hash 会被 X 定期轮换, 所以只看名字 */
+export function matchOperation(url: string): string | null {
+    if (!url.includes('/i/api/graphql/')) return null;
+    let op: string;
+    try {
+        op = new URL(url).pathname.split('/').pop() ?? '';
+    } catch {
+        return null;
+    }
+    return collectConfig.operations.test(op) ? op : null;
+}
+
+export interface Capture {
+    readonly seenTweets: Set<string>;
+    readonly captures: number;
+    detach(): Promise<void>;
+}
+
+/**
+ * 给一个页面挂上响应监听, 把命中的 GraphQL 响应原样追加到 jsonl。
+ * 与 x.com 无关 —— 所以可以用本地假页面完整测试这段逻辑。
+ */
+export function attachCapture(conn: CdpConnection, page: CdpPage, file: string, query: string): Capture {
+    const seenTweets = new Set<string>();
+    const watching = new Map<string, string>(); // requestId -> url
+    let captures = 0;
+    let pending = 0;
+
+    const offResponse = conn.on('Network.responseReceived', (params, sid) => {
+        if (sid !== page.sessionId) return;
+        const url = String((params.response as { url?: string })?.url ?? '');
+        if (matchOperation(url)) watching.set(String(params.requestId), url);
+    });
+
+    // 応答本体は loadingFinished を待たないと取れない
+    const offFinished = conn.on('Network.loadingFinished', (params, sid) => {
+        if (sid !== page.sessionId) return;
+        const requestId = String(params.requestId);
+        const url = watching.get(requestId);
+        if (!url) return;
+        watching.delete(requestId);
+
+        pending++;
+        void (async () => {
+            try {
+                const raw = await getResponseBody(conn, requestId, page.sessionId);
+                if (!raw) return;
+                const body = JSON.parse(raw);
+                const capture: RawCapture = {
+                    op: matchOperation(url) ?? 'unknown',
+                    url,
+                    capturedAt: new Date().toISOString(),
+                    query,
+                    body,
+                };
+                await appendFile(file, `${JSON.stringify(capture)}\n`, 'utf8');
+                captures++;
+                for (const id of collectTweetNodes(body).keys()) seenTweets.add(id);
+            } catch {
+                // JSON でない / 既に破棄された応答は黙って捨てる
+            } finally {
+                pending--;
+            }
+        })();
+    });
+
+    return {
+        seenTweets,
+        get captures() {
+            return captures;
+        },
+        async detach() {
+            // 走査中の書き込みを取りこぼさないよう、落ち着くまで待つ
+            for (let i = 0; i < 100 && pending > 0; i++) await sleep(100);
+            offResponse();
+            offFinished();
+        },
+    };
+}
+
+/** 慢慢往下滚, 直到连续若干轮没有新推文, 或达到上限 */
+export async function autoScroll(page: CdpPage, capture: Capture, label = ''): Promise<void> {
+    let idle = 0;
+    let last = 0;
+
+    while (capture.seenTweets.size < collectConfig.maxTweetsPerQuery && idle < collectConfig.idleRoundsBeforeStop) {
+        await page.evaluate('window.scrollBy(0, window.innerHeight * 0.9)');
+        await sleep(randomDelay());
+
+        if (capture.seenTweets.size === last) {
+            idle++;
+        } else {
+            idle = 0;
+            last = capture.seenTweets.size;
+            if (label) process.stdout.write(`\r    ${label} — ${capture.seenTweets.size} 件`);
+        }
+    }
+}
+
+export async function connect(): Promise<CdpConnection> {
+    try {
+        return await connectCdp(collectConfig.cdpEndpoint);
+    } catch (err) {
+        throw new Error(
+            `Chrome に接続できませんでした (${collectConfig.cdpEndpoint})\n\n` +
+                'リモートデバッグを有効にして Chrome を起動してください。\n' +
+                'Chrome 136 以降は既定プロファイルでのリモートデバッグを拒否するため、\n' +
+                '--user-data-dir で専用プロファイルを指定する必要があります:\n\n' +
+                '  macOS:   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \\\n' +
+                '             --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"\n' +
+                '  Windows: chrome.exe --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\\chrome-c108"\n' +
+                '  Linux:   google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"\n\n' +
+                'その専用プロファイルで一度 X にログインしてから実行してください。\n\n' +
+                `原因: ${(err as Error).message}`,
+        );
+    }
+}
+
+export interface CollectResult {
+    query: string;
+    captures: number;
+    tweets: number;
+    file: string;
+}
+
+async function collectQuery(conn: CdpConnection, page: CdpPage, query: string, runId: string): Promise<CollectResult> {
+    const file = join(paths.raw, `${runId}-${slugify(query)}.jsonl`);
+    const capture = attachCapture(conn, page, file, query);
+
+    await page.navigate(`https://x.com/search?q=${encodeURIComponent(query)}&f=live`);
+    await sleep(2500);
+
+    const current = await page.url().catch(() => '');
+    if (/\/login|\/i\/flow\/login/.test(current)) {
+        await capture.detach();
+        throw new Error('ログイン画面に飛ばされました。接続先の Chrome で X にログインしてから実行してください。');
+    }
+
+    if (collectConfig.autoScroll) {
+        await autoScroll(page, capture, query);
+    } else {
+        console.log('\n    autoScroll = false: ブラウザで手動スクロールしてください。終わったら Enter。');
+        await new Promise<void>((resolve) => process.stdin.once('data', () => resolve()));
+    }
+
+    await capture.detach();
+    process.stdout.write(`\r    ${query} — ${capture.seenTweets.size} 件 (応答 ${capture.captures} 件)\n`);
+
+    return { query, captures: capture.captures, tweets: capture.seenTweets.size, file };
+}
+
+export async function collectAll(queries = collectConfig.queries): Promise<CollectResult[]> {
+    await mkdir(paths.raw, { recursive: true });
+
+    const conn = await connect();
+    const page = await openPage(conn);
+    const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const results: CollectResult[] = [];
+
+    try {
+        for (const [i, query] of queries.entries()) {
+            console.log(`  [${i + 1}/${queries.length}] ${query}`);
+            results.push(await collectQuery(conn, page, query, runId));
+            await sleep(randomDelay());
+        }
+    } finally {
+        await page.close().catch(() => {});
+        // 接続先はユーザー自身の Chrome なので、閉じるのは WebSocket だけ
+        conn.close();
+    }
+
+    return results;
+}
