@@ -105,12 +105,19 @@ export async function connectCdp(endpoint: string, timeoutMs = 15000): Promise<C
     };
 }
 
+export interface Viewport {
+    width: number;
+    height: number;
+}
+
 export interface CdpPage {
     targetId: string;
     sessionId: string;
     navigate(url: string): Promise<void>;
     evaluate<T = unknown>(expression: string): Promise<T>;
     url(): Promise<string>;
+    /** 実ウィンドウとは無関係に描画上の視口サイズを決める。縦を大きく取ると走査が速い */
+    setViewport(viewport: Viewport): Promise<void>;
     close(): Promise<void>;
 }
 
@@ -118,7 +125,7 @@ export interface CdpPage {
  * 在已连接的浏览器里开一个新标签页。
  * 用户自身のブラウザなので、その profile の Cookie(= X のログイン状態)をそのまま引き継ぐ。
  */
-export async function openPage(conn: CdpConnection): Promise<CdpPage> {
+export async function openPage(conn: CdpConnection, viewport?: Viewport): Promise<CdpPage> {
     const { targetId } = await conn.send<{ targetId: string }>('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await conn.send<{ sessionId: string }>('Target.attachToTarget', { targetId, flatten: true });
 
@@ -126,9 +133,21 @@ export async function openPage(conn: CdpConnection): Promise<CdpPage> {
     await conn.send('Network.enable', {}, sessionId);
     await conn.send('Runtime.enable', {}, sessionId);
 
+    if (viewport) {
+        await conn.send(
+            'Emulation.setDeviceMetricsOverride',
+            { ...viewport, deviceScaleFactor: 1, mobile: false },
+            sessionId,
+        );
+    }
+
     return {
         targetId,
         sessionId,
+
+        async setViewport(v: Viewport) {
+            await conn.send('Emulation.setDeviceMetricsOverride', { ...v, deviceScaleFactor: 1, mobile: false }, sessionId);
+        },
 
         async navigate(url: string) {
             const loaded = new Promise<void>((resolve) => {

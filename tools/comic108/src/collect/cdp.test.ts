@@ -134,8 +134,12 @@ try {
     const conn = await connectCdp(`http://127.0.0.1:${DEBUG_PORT}`);
     check('起動済み Chrome に CDP で接続できる', true);
 
-    const page = await openPage(conn);
+    const page = await openPage(conn, { width: 1440, height: 3200 });
     check('新しいタブを開ける', !!page.sessionId && !!page.targetId);
+
+    await page.navigate(`http://127.0.0.1:${server.port}/`);
+    // 視口を高く取れているか。ここが実ウィンドウ相当のままだと走査が桁違いに遅くなる
+    check('視口の高さを上書きできている', (await page.evaluate<number>('window.innerHeight')) === 3200, await page.evaluate('window.innerHeight'));
 
     const capture = attachCapture(conn, page, file, 'テストクエリ');
     await page.navigate(`http://127.0.0.1:${server.port}/`);

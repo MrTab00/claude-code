@@ -75,6 +75,7 @@ bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chro
 | `bun run collect --max=30` | 限制每个关键词的采集量，用来小样试跑 |
 | `bun run collect:api` | 官方 API 采集（需要 `X_BEARER_TOKEN`） |
 | `bun run parse` | 解析成 `data/dataset.json`，**纯离线，可反复重跑** |
+| `bun run inspect` | 诊断：解析命中率 + 没解析出来的推文原文 |
 | `bun run build` | 生成 `dist/c108.html` |
 | `bun run build --embed-media` | 图片下载后 base64 内联，离线也能看 |
 | `bun run demo` | 用内置样例数据出一份 HTML |

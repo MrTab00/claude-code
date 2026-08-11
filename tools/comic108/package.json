@@ -9,6 +9,7 @@
         "collect": "bun run src/cli/collect.ts",
         "collect:api": "bun run src/cli/collect-api.ts",
         "parse": "bun run src/cli/parse.ts",
+        "inspect": "bun run src/cli/inspect.ts",
         "build": "bun run src/cli/build.ts",
         "all": "bun run collect && bun run parse && bun run build",
         "demo": "bun run src/cli/demo.ts",

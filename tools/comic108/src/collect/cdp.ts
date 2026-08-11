@@ -280,7 +280,7 @@ export async function collectAll(
     await mkdir(paths.raw, { recursive: true });
 
     const conn = await connect(autoLaunch);
-    const page = await openPage(conn);
+    const page = await openPage(conn, collectConfig.viewport);
     const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const results: CollectResult[] = [];
 
