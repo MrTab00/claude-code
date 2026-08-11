@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { RawCapture } from '../types';
-import { attachCapture, matchOperation } from './cdp';
+import { attachCapture, autoScroll, matchOperation } from './cdp';
 import { connectCdp, openPage } from './cdp-client';
 
 const CHROME_CANDIDATES = [
@@ -75,18 +75,28 @@ const server = Bun.serve({
         // GraphQL ではない API —— 捕獲されてはいけない
         if (pathname.startsWith('/i/api/2/')) return Response.json({ notGraphql: true });
 
+        // 本物のタイムラインと同じく「下端に近づいた時だけ」次を読む無限スクロール。
+        // 毎スクロールで無条件に読み込む作りにすると、下端まで到達しないまま
+        // 諦めてしまうバグを取り逃がす。
         return new Response(
             `<!doctype html><meta charset="utf-8"><title>fake x</title>
-             <div style="height:6000px">scroll me</div>
+             <div id="feed" style="height:6000px">scroll me</div>
              <script>
+               const feed = document.getElementById('feed');
+               let loading = false, pages = 0;
                const hit = () => {
                  fetch('/i/api/graphql/AbC123hash/SearchTimeline?variables=%7B%7D');
                  fetch('/i/api/graphql/XyZ789hash/AudioSpaceById');
                  fetch('/i/api/2/notifications/all.json');
                };
                hit();
-               let n = 0;
-               addEventListener('scroll', () => { if (++n % 2 === 0) hit(); });
+               addEventListener('scroll', () => {
+                 if (loading || pages >= 4) return;
+                 const nearBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 400;
+                 if (!nearBottom) return;
+                 loading = true;
+                 setTimeout(() => { pages++; feed.style.height = (6000 * (pages + 1)) + 'px'; hit(); loading = false; }, 150);
+               });
              </script>`,
             { headers: { 'content-type': 'text/html' } },
         );
@@ -130,16 +140,17 @@ try {
     const capture = attachCapture(conn, page, file, 'テストクエリ');
     await page.navigate(`http://127.0.0.1:${server.port}/`);
 
-    for (let i = 0; i < 8; i++) {
-        await page.evaluate('window.scrollBy(0, window.innerHeight * 0.9)');
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    // 本番と同じ autoScroll を使う。手でスクロールして通してしまうと、
+    // 「下端に着く前に諦める」バグを見逃す
+    await autoScroll(page, capture, { maxTweets: 9999, delay: () => 120 });
     await new Promise((r) => setTimeout(r, 600));
     await capture.detach();
 
     check('location.href を読める', (await page.url()).includes(`:${server.port}`));
     check('SearchTimeline の応答を捕獲した', capture.captures >= 2, capture.captures);
-    check('ページが実際に複数回リクエストしている', pageRequests >= 2, pageRequests);
+    // 下端まで下りきって次ページを引き出せているか —— 1 ページ目で止まっていないこと
+    check('無限スクロールを最後まで辿れている', capture.captures >= 4, capture.captures);
+    check('ページが実際に複数回リクエストしている', pageRequests >= 4, pageRequests);
     check('ツイート id を数えている(リツイート含む 6 件)', capture.seenTweets.size === 6, [...capture.seenTweets]);
     check('jsonl が書かれている', existsSync(file));
 

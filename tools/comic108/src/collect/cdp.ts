@@ -108,27 +108,56 @@ export function attachCapture(conn: CdpConnection, page: CdpPage, file: string, 
     };
 }
 
-/** 慢慢往下滚, 直到连续若干轮没有新推文, 或达到上限 */
-export async function autoScroll(
-    page: CdpPage,
-    capture: Capture,
-    label = '',
-    maxTweets = collectConfig.maxTweetsPerQuery,
-): Promise<void> {
+export interface ScrollOptions {
+    label?: string;
+    maxTweets?: number;
+    /** 1 回のスクロール後の待ち時間(ms)。テストから短縮するために差し替えられる */
+    delay?: () => number;
+}
+
+/**
+ * 慢慢往下滚, 直到「已经到底、而且没有新推文」为止。
+ *
+ * 「新しいツイートが増えない」だけで打ち切ってはいけない: 既に読み込み済みの
+ * 24 件ぶんを下っている最中は当然増えないし、タイムラインが次のページを取りに行くのは
+ * 下端に近づいた時だけ。途中で諦めると 1 ページ目しか採れない。
+ * だから空転として数えるのは、下端に到達した(もしくはもう動かない)場合に限る。
+ */
+export async function autoScroll(page: CdpPage, capture: Capture, options: ScrollOptions = {}): Promise<void> {
+    const { label = '', maxTweets = collectConfig.maxTweetsPerQuery, delay = randomDelay } = options;
+
+    // scrollTop への代入は smooth 指定の影響を受けず必ず即時に効く
+    const step = `(() => {
+        const e = document.scrollingElement || document.documentElement;
+        e.scrollTop = e.scrollTop + window.innerHeight * 1.5;
+        return { y: e.scrollTop, h: window.innerHeight, total: e.scrollHeight };
+    })()`;
+
     let idle = 0;
-    let last = 0;
+    let lastCount = 0;
+    let lastY = -1;
 
-    while (capture.seenTweets.size < maxTweets && idle < collectConfig.idleRoundsBeforeStop) {
-        await page.evaluate('window.scrollBy(0, window.innerHeight * 0.9)');
-        await sleep(randomDelay());
+    for (let round = 0; round < 2000; round++) {
+        if (capture.seenTweets.size >= maxTweets || idle >= collectConfig.idleRoundsBeforeStop) break;
 
-        if (capture.seenTweets.size === last) {
+        const m = await page.evaluate<{ y: number; h: number; total: number }>(step);
+        await sleep(delay());
+
+        const grew = capture.seenTweets.size > lastCount;
+        const moved = m.y > lastY + 8;
+        const atBottom = m.y + m.h >= m.total - 400;
+
+        if (grew) {
+            idle = 0;
+            lastCount = capture.seenTweets.size;
+            if (label) process.stdout.write(`\r    ${label} — ${capture.seenTweets.size} 件`);
+        } else if (atBottom || !moved) {
             idle++;
         } else {
-            idle = 0;
-            last = capture.seenTweets.size;
-            if (label) process.stdout.write(`\r    ${label} — ${capture.seenTweets.size} 件`);
+            idle = 0; // まだ既読分を下っている途中
         }
+
+        lastY = m.y;
     }
 }
 
@@ -226,7 +255,7 @@ async function collectQuery(
     }
 
     if (collectConfig.autoScroll) {
-        await autoScroll(page, capture, query, maxTweets);
+        await autoScroll(page, capture, { label: query, maxTweets });
     } else {
         console.log('\n    autoScroll = false: ブラウザで手動スクロールしてください。終わったら Enter。');
         await waitForEnter();
