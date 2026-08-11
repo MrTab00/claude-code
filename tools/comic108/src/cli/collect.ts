@@ -15,17 +15,24 @@ const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const queries = args.length > 0 ? args : collectConfig.queries;
 const autoLaunch = !flags.includes('--no-launch');
 
+const maxFlag = flags.find((f) => f.startsWith('--max='))?.split('=')[1];
+const maxTweets = maxFlag ? Number(maxFlag) : collectConfig.maxTweetsPerQuery;
+if (Number.isNaN(maxTweets) || maxTweets < 1) {
+    console.error('--max= には 1 以上の数値を指定してください');
+    process.exit(1);
+}
+
 console.log(`
 採集開始
   接続先     ${collectConfig.cdpEndpoint}${autoLaunch ? ' (必要なら Chrome を自動起動)' : ''}
   プロファイル ${PROFILE_DIR}
   キーワード  ${queries.length} 件
-  上限       1 キーワードあたり ${collectConfig.maxTweetsPerQuery} 件
+  上限       1 キーワードあたり ${maxTweets} 件
   スクロール  ${collectConfig.autoScroll ? '自動' : '手動'}
 `);
 
 try {
-    const results = await collectAll(queries, autoLaunch);
+    const results = await collectAll(queries, { autoLaunch, maxTweets });
     const tweets = results.reduce((n, r) => n + r.tweets, 0);
     const captures = results.reduce((n, r) => n + r.captures, 0);
 

@@ -72,6 +72,7 @@ bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chro
 | `bun run doctor` | 环境自检：Chrome、调试端口、X 登录状态 |
 | `bun run collect` | CDP 采集，落 `data/raw/*.jsonl`（需要时自动启动 Chrome） |
 | `bun run collect "#C108 お品書き"` | 只跑指定关键词 |
+| `bun run collect --max=30` | 限制每个关键词的采集量，用来小样试跑 |
 | `bun run collect:api` | 官方 API 采集（需要 `X_BEARER_TOKEN`） |
 | `bun run parse` | 解析成 `data/dataset.json`，**纯离线，可反复重跑** |
 | `bun run build` | 生成 `dist/c108.html` |

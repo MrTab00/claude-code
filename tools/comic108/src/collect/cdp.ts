@@ -109,11 +109,16 @@ export function attachCapture(conn: CdpConnection, page: CdpPage, file: string, 
 }
 
 /** 慢慢往下滚, 直到连续若干轮没有新推文, 或达到上限 */
-export async function autoScroll(page: CdpPage, capture: Capture, label = ''): Promise<void> {
+export async function autoScroll(
+    page: CdpPage,
+    capture: Capture,
+    label = '',
+    maxTweets = collectConfig.maxTweetsPerQuery,
+): Promise<void> {
     let idle = 0;
     let last = 0;
 
-    while (capture.seenTweets.size < collectConfig.maxTweetsPerQuery && idle < collectConfig.idleRoundsBeforeStop) {
+    while (capture.seenTweets.size < maxTweets && idle < collectConfig.idleRoundsBeforeStop) {
         await page.evaluate('window.scrollBy(0, window.innerHeight * 0.9)');
         await sleep(randomDelay());
 
@@ -201,7 +206,13 @@ export interface CollectResult {
     file: string;
 }
 
-async function collectQuery(conn: CdpConnection, page: CdpPage, query: string, runId: string): Promise<CollectResult> {
+async function collectQuery(
+    conn: CdpConnection,
+    page: CdpPage,
+    query: string,
+    runId: string,
+    maxTweets: number,
+): Promise<CollectResult> {
     const file = join(paths.raw, `${runId}-${slugify(query)}.jsonl`);
     const capture = attachCapture(conn, page, file, query);
 
@@ -215,7 +226,7 @@ async function collectQuery(conn: CdpConnection, page: CdpPage, query: string, r
     }
 
     if (collectConfig.autoScroll) {
-        await autoScroll(page, capture, query);
+        await autoScroll(page, capture, query, maxTweets);
     } else {
         console.log('\n    autoScroll = false: ブラウザで手動スクロールしてください。終わったら Enter。');
         await waitForEnter();
@@ -227,7 +238,16 @@ async function collectQuery(conn: CdpConnection, page: CdpPage, query: string, r
     return { query, captures: capture.captures, tweets: capture.seenTweets.size, file };
 }
 
-export async function collectAll(queries = collectConfig.queries, autoLaunch = true): Promise<CollectResult[]> {
+export interface CollectOptions {
+    autoLaunch?: boolean;
+    /** 1 キーワードあたりの上限。小さくして試し撃ちするのに使う */
+    maxTweets?: number;
+}
+
+export async function collectAll(
+    queries = collectConfig.queries,
+    { autoLaunch = true, maxTweets = collectConfig.maxTweetsPerQuery }: CollectOptions = {},
+): Promise<CollectResult[]> {
     await mkdir(paths.raw, { recursive: true });
 
     const conn = await connect(autoLaunch);
@@ -240,7 +260,7 @@ export async function collectAll(queries = collectConfig.queries, autoLaunch = t
 
         for (const [i, query] of queries.entries()) {
             console.log(`  [${i + 1}/${queries.length}] ${query}`);
-            results.push(await collectQuery(conn, page, query, runId));
+            results.push(await collectQuery(conn, page, query, runId, maxTweets));
             await sleep(randomDelay());
         }
     } finally {
