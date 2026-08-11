@@ -5,6 +5,7 @@
     "type": "module",
     "description": "C108 サークル / コスプレイヤー 情報の採集・整理ツール",
     "scripts": {
+        "doctor": "bun run src/cli/doctor.ts",
         "collect": "bun run src/cli/collect.ts",
         "collect:api": "bun run src/cli/collect-api.ts",
         "parse": "bun run src/cli/parse.ts",

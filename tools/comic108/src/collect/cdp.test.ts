@@ -155,6 +155,23 @@ try {
 
     await page.close();
     conn.close();
+
+    // --- 自動起動の経路 ---
+    // 手で長いコマンドを打たせないための仕組みなので、探索→起動→接続まで通しで確かめる
+    const { launchChrome, findChrome, endpointAlive } = await import('./launch');
+    check('Chrome を自動検出できる', !!findChrome(), findChrome());
+    check('未起動のエンドポイントは死んでいると判定する', !(await endpointAlive('http://127.0.0.1:9399')));
+
+    const launched = await launchChrome({ endpoint: 'http://127.0.0.1:9334', headless: true, timeoutMs: 40000 });
+    check('自動起動できる', !!launched, launched);
+    check('起動後はエンドポイントが応答する', await endpointAlive('http://127.0.0.1:9334'));
+
+    const conn2 = await connectCdp('http://127.0.0.1:9334');
+    const page2 = await openPage(conn2);
+    await page2.navigate(`http://127.0.0.1:${server.port}/`);
+    check('自動起動した Chrome でページを開ける', (await page2.url()).includes(`:${server.port}`));
+    await page2.close();
+    conn2.close();
 } finally {
     chrome.kill();
     await chrome.exited.catch(() => {});

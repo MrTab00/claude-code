@@ -31,39 +31,37 @@ X 的场景比它更有利：X 网页前端本身就在调自己的内部 GraphQ
 bun run demo     # -> dist/c108-demo.html
 ```
 
-真正跑一遍：
+真正跑一遍——**不用手动开 Chrome，脚本会处理**：
 
 ```bash
-# 1. 启动带调试端口的 Chrome（见下方说明），并在里面登录 X
-# 2. 采集
-bun run collect
-# 3. 解析
-bun run parse
-# 4. 出 HTML
-bun run build
+bun run doctor    # 环境自检（可选，但建议第一次跑）
+bun run all       # 采集 -> 解析 -> 出 HTML
 ```
 
-或者一条龙：`bun run all`
+第一次运行会自动拉起一个 Chrome 窗口。**在那个窗口里登录一次 X，回终端按 Enter**，采集就开始了。登录状态存在项目下的 `.chrome-profile/`，之后再跑就不用登录了。
 
 ---
 
-## 启动 Chrome
+## 关于 Chrome
 
-**Chrome 136 之后不允许在默认 profile 上开远程调试**，必须用 `--user-data-dir` 指定一个专用目录。第一次在这个专用 profile 里登录一次 X，之后一直复用。
+脚本会自己找到 Chrome（macOS / Windows / Linux 的常见安装路径，也支持 Edge），用 `--remote-debugging-port` 加一个**专用 profile** 启动它。
+
+用专用 profile 不是洁癖——**Chrome 136 之后禁止在默认 profile 上开远程调试**，这是硬性要求。好处是它跟你日常用的 Chrome 完全隔离，互不干扰。
+
+如果你想自己控制：
 
 ```bash
-# macOS
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"
-
-# Windows
-chrome.exe --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\chrome-c108"
-
-# Linux
-google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"
+bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chrome
 ```
 
-端口可以用 `C108_CDP=http://127.0.0.1:9333` 改。
+手动启动的命令 `bun run doctor` 会照着你的系统打印出来。
+
+| 环境变量 | 作用 |
+|----------|------|
+| `C108_CDP` | 调试端口，默认 `http://127.0.0.1:9222` |
+| `CHROME_PATH` | 指定 Chrome 可执行文件 |
+| `C108_PROFILE_DIR` | 换一个 profile 目录 |
+| `C108_CHROME_ARGS` | 追加启动参数（例如容器里需要 `--no-sandbox`） |
 
 ---
 
@@ -71,7 +69,8 @@ google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"
 
 | 命令 | 作用 |
 |------|------|
-| `bun run collect` | CDP 采集，落 `data/raw/*.jsonl` |
+| `bun run doctor` | 环境自检：Chrome、调试端口、X 登录状态 |
+| `bun run collect` | CDP 采集，落 `data/raw/*.jsonl`（需要时自动启动 Chrome） |
 | `bun run collect "#C108 お品書き"` | 只跑指定关键词 |
 | `bun run collect:api` | 官方 API 采集（需要 `X_BEARER_TOKEN`） |
 | `bun run parse` | 解析成 `data/dataset.json`，**纯离线，可反复重跑** |

@@ -6,5 +6,8 @@ dist/
 
 node_modules/
 
+# 自動起動する Chrome の専用プロファイル(X のログインが入る)
+.chrome-profile/
+
 # 手動補記は各自のもの。テンプレートは manual.example.txt を参照
 data/manual.txt

@@ -15,6 +15,7 @@ import { collect as collectConfig, paths } from '../../config';
 import { collectTweetNodes } from '../parse/extract';
 import type { RawCapture } from '../types';
 import { type CdpConnection, type CdpPage, connectCdp, getResponseBody, openPage } from './cdp-client';
+import { PROFILE_DIR, endpointAlive, launchChrome, manualCommand } from './launch';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -126,23 +127,71 @@ export async function autoScroll(page: CdpPage, capture: Capture, label = ''): P
     }
 }
 
-export async function connect(): Promise<CdpConnection> {
+/** Enter が押されるまで待つ */
+function waitForEnter(): Promise<void> {
+    return new Promise((resolve) => {
+        process.stdin.resume();
+        process.stdin.once('data', () => {
+            process.stdin.pause();
+            resolve();
+        });
+    });
+}
+
+/**
+ * 繋がらなければ Chrome を起動してから繋ぐ。
+ * 手で長いコマンドを打たせないためで、--no-launch で従来どおり手動起動にもできる。
+ */
+export async function connect(autoLaunch = true): Promise<CdpConnection> {
+    const endpoint = collectConfig.cdpEndpoint;
+
+    if (!(await endpointAlive(endpoint))) {
+        if (!autoLaunch) {
+            throw new Error(
+                `Chrome に接続できませんでした (${endpoint})\n\n` +
+                    'リモートデバッグ付きで起動してください:\n  ' +
+                    manualCommand(Number(new URL(endpoint).port || 9222)),
+            );
+        }
+        console.log('  Chrome が起動していないので起動します...');
+        await launchChrome({ endpoint });
+    }
+
     try {
-        return await connectCdp(collectConfig.cdpEndpoint);
+        return await connectCdp(endpoint);
     } catch (err) {
         throw new Error(
-            `Chrome に接続できませんでした (${collectConfig.cdpEndpoint})\n\n` +
-                'リモートデバッグを有効にして Chrome を起動してください。\n' +
-                'Chrome 136 以降は既定プロファイルでのリモートデバッグを拒否するため、\n' +
-                '--user-data-dir で専用プロファイルを指定する必要があります:\n\n' +
-                '  macOS:   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \\\n' +
-                '             --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"\n' +
-                '  Windows: chrome.exe --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\\chrome-c108"\n' +
-                '  Linux:   google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/chrome-c108"\n\n' +
-                'その専用プロファイルで一度 X にログインしてから実行してください。\n\n' +
-                `原因: ${(err as Error).message}`,
+            `Chrome には届いていますが CDP 接続に失敗しました (${endpoint})\n` +
+                `原因: ${(err as Error).message}\n\n` +
+                '手動で起動し直す場合:\n  ' +
+                manualCommand(Number(new URL(endpoint).port || 9222)),
         );
     }
+}
+
+/**
+ * X にログインしているか確かめ、していなければその場でログインしてもらう。
+ * 専用プロファイルを使うので初回は必ず未ログイン —— ここで案内しないと
+ * 「0 件で終わった、なぜ」になる。
+ */
+export async function ensureLoggedIn(page: CdpPage): Promise<void> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        await page.navigate('https://x.com/home');
+        await sleep(2500);
+
+        const url = await page.url().catch(() => '');
+        if (/x\.com\/home/.test(url)) return;
+
+        console.log(
+            `\n  X にログインしていません。\n` +
+                `  今開いている Chrome のウィンドウで X にログインしてください。\n` +
+                `  (ログイン状態は ${PROFILE_DIR} に残るので、次回からは不要です)\n` +
+                `\n  ログインし終えたら Enter を押してください...`,
+        );
+        await waitForEnter();
+    }
+
+    throw new Error('ログインが確認できませんでした。Chrome のウィンドウで X にログインしてから再実行してください。');
 }
 
 export interface CollectResult {
@@ -169,7 +218,7 @@ async function collectQuery(conn: CdpConnection, page: CdpPage, query: string, r
         await autoScroll(page, capture, query);
     } else {
         console.log('\n    autoScroll = false: ブラウザで手動スクロールしてください。終わったら Enter。');
-        await new Promise<void>((resolve) => process.stdin.once('data', () => resolve()));
+        await waitForEnter();
     }
 
     await capture.detach();
@@ -178,15 +227,17 @@ async function collectQuery(conn: CdpConnection, page: CdpPage, query: string, r
     return { query, captures: capture.captures, tweets: capture.seenTweets.size, file };
 }
 
-export async function collectAll(queries = collectConfig.queries): Promise<CollectResult[]> {
+export async function collectAll(queries = collectConfig.queries, autoLaunch = true): Promise<CollectResult[]> {
     await mkdir(paths.raw, { recursive: true });
 
-    const conn = await connect();
+    const conn = await connect(autoLaunch);
     const page = await openPage(conn);
     const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const results: CollectResult[] = [];
 
     try {
+        await ensureLoggedIn(page);
+
         for (const [i, query] of queries.entries()) {
             console.log(`  [${i + 1}/${queries.length}] ${query}`);
             results.push(await collectQuery(conn, page, query, runId));
