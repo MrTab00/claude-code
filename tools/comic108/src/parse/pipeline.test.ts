@@ -120,6 +120,18 @@ check('プロフィールから配置を拾う', fromBio?.booths[0]?.display ===
 check('プロフ由来は source=bio', fromBio?.booths[0]?.source === 'bio');
 check('補完件数が stats に出る', profileSet.stats.boothsInherited === 2, profileSet.stats.boothsInherited);
 
+// 本文から地区しか読めなかった場合、表示名の完全な配置を優先する
+const partialText = buildDataset([{
+    id: '3003', text: '■夏コミ #C108 お品書き■ 今回は南館の配置となっていますので涼しいハズ',
+    screenName: 'partial_circle', displayName: '松本規之 C108 8/16「 南1 T-17ab 麒麟堂」新刊アリ',
+    createdAt: '2026-08-10T08:00:00.000Z', hashtags: ['C108'], media: [],
+    url: 'https://x.com/partial_circle/status/3003', isRetweet: false,
+}], {}, 1);
+const upgraded = partialText.circles[0];
+check('地区だけの本文より表示名の完全な配置を優先', upgraded?.booths[0]?.display === '2日目 南1 T-17ab', upgraded?.booths);
+check('優先した配置は source=name', upgraded?.booths[0]?.source === 'name');
+check('部分的な本文の配置は残さない', upgraded?.booths.length === 1, upgraded?.booths);
+
 // --- overrides ---
 const patched = buildDataset(tweets, { '1005': { circleName: '手動で直した名前' }, '@rt_sample': { drop: true } }, 1);
 check('overrides が適用される', patched.stats.overridesApplied >= 1, patched.stats.overridesApplied);

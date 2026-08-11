@@ -165,8 +165,15 @@ export function parseBooths(input: string): Booth[] {
         );
     }
 
-    // B: ブロック + 番号 + ab, 没有地区。要求 ab 后缀, 否则噪声太大
-    const reB = new RegExp(`${QUOTE_L}(${BLOCK})${QUOTE_R}\\s*(?:ブロック)?\\s*${SEP}([0-9]{1,2})\\s*(ab|AB|a|b|A|B)\\b`, 'g');
+    // B: ブロック + 番号 + ab, 地区の手がかり無し。
+    //
+    // 地区が無いぶん誤検出しやすい。平仮名ブロック(あ〜ん)には「は」「が」のような助詞が
+    // そのまま含まれるので、空白だけで区切られた形を許すと「新刊は 12b 500円です」の
+    // 「は」をブロックとして拾ってしまう。区切り記号があるか、数字と地続きの場合だけ認める。
+    const reB = new RegExp(
+        `${QUOTE_L}(${BLOCK})${QUOTE_R}(?:\\s*ブロック\\s*)?(?:[-ー－‐‑–—_・]\\s*)?([0-9]{1,2})\\s*(ab|AB|a|b|A|B)\\b`,
+        'g',
+    );
     for (const m of text.matchAll(reB)) {
         if (m.index === undefined) continue;
         if (overlaps(spans, m.index, m.index + m[0].length)) continue;
@@ -176,6 +183,33 @@ export function parseBooths(input: string): Booth[] {
                 day: pickDay(markers, m.index),
                 area: null,
                 hall: null,
+                block,
+                number: Number(num),
+                ab: toAB(ab),
+                raw: raw.trim(),
+                confidence: 'high',
+            },
+            { start: m.index, end: m.index + raw.length },
+        );
+    }
+
+    // E: ブロックを番号の後ろに書く形 「東7 28b Jブロック」。
+    // 語尾の「ブロック」を必須にして誤検出を抑える
+    const reE = new RegExp(
+        `(?:([東西南])\\s*([0-9]{1,2})?\\s*(?:ホール|地区)?\\s*)?` +
+            `([0-9]{1,2})\\s*(ab|AB|a|b|A|B)\\s*` +
+            `${QUOTE_L}(${BLOCK})${QUOTE_R}\\s*ブロック`,
+        'g',
+    );
+    for (const m of text.matchAll(reE)) {
+        if (m.index === undefined) continue;
+        if (overlaps(spans, m.index, m.index + m[0].length)) continue;
+        const [raw, area, hall, num, ab, block] = m;
+        push(
+            {
+                day: pickDay(markers, m.index),
+                area: (area as Area) ?? null,
+                hall: hall ?? null,
                 block,
                 number: Number(num),
                 ab: toAB(ab),

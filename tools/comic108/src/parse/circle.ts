@@ -70,8 +70,14 @@ function boothsFromProfile(tweet: NormalizedTweet): Circle['booths'] {
 
 export function buildCircle(tweet: NormalizedTweet, dual: boolean): Circle {
     const text = normalize(tweet.text);
+    // 本文から完全な配置が読めなかった時だけプロフィールを見る。
+    // 「本文が 0 件のときだけ」にすると、本文から地区しか読めなかった場合に
+    // 表示名の完全な配置(「松本規之 C108 8/16「南1 T-17ab」」など)を見逃す。
     const booths = parseBooths(tweet.text);
-    if (booths.length === 0) booths.push(...boothsFromProfile(tweet));
+    if (!booths.some((b) => b.confidence === 'high')) {
+        const profile = boothsFromProfile(tweet);
+        if (profile.length) booths.splice(0, booths.length, ...profile);
+    }
     const works = extractWorks(text);
     const { name, confidence } = extractCircleName(text, tweet.displayName, works);
     const price = text.match(PRICE);

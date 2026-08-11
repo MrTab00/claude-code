@@ -110,6 +110,24 @@ const cases: Case[] = [
         count: 2,
     },
     {
+        name: '実データ: ブロックが番号の後ろ 東7 28b Jブロック',
+        input: 'きょーね@C108(土)東7 28b Jブロック',
+        expect: { day: 1, area: '東', hall: '7', block: 'J', number: 28, ab: 'b', confidence: 'high' },
+        count: 1,
+    },
+    {
+        name: '実データ: 表示名の中の 南1 T-17ab',
+        input: '松本規之 C108 8/16「 南1 T-17ab 麒麟堂」新刊アリ',
+        expect: { day: 2, area: '南', hall: '1', block: 'T', number: 17, ab: 'ab', confidence: 'high' },
+        count: 1,
+    },
+    {
+        name: 'ブロック語尾が無ければ番号後ろ形は拾わない(誤検出防止)',
+        input: '新刊は 12b 500円です',
+        expect: null,
+        count: 0,
+    },
+    {
         name: '配置を含まない文は 0 件',
         input: '明日はコミケです！よろしくお願いします',
         expect: null,
