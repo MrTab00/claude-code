@@ -89,11 +89,36 @@ const withSibling = [
 const inheritedSet = buildDataset(withSibling, {}, 1);
 const borrowed = inheritedSet.circles.find((c) => c.tweetId === '2001');
 check('配置の無いツイートが同じアカウントから引き継ぐ', borrowed?.booths[0]?.display === '2日目 東A-12b', borrowed?.booths);
-check('引き継いだ配置は inherited が立つ', borrowed?.booths[0]?.inherited === true);
+check('引き継いだ配置は source=account が立つ', borrowed?.booths[0]?.source === 'account');
 check('引き継いだ配置の確度は low', borrowed?.booths[0]?.confidence === 'low');
 check('引き継ぎ件数が stats に出る', inheritedSet.stats.boothsInherited === 1, inheritedSet.stats.boothsInherited);
 check('自前で配置があるツイートは上書きされない',
-    inheritedSet.circles.find((c) => c.tweetId === '1001')?.booths[0]?.inherited === undefined);
+    inheritedSet.circles.find((c) => c.tweetId === '1001')?.booths[0]?.source === undefined);
+
+// --- 表示名 / プロフィールからの補完 ---
+// サークルはイベント週になると表示名やプロフィールに配置を書く。本文に無くてもそこから拾える。
+const profileTweets = [
+    {
+        id: '3001', text: 'お品書きできました！当日はよろしくお願いします #C108',
+        screenName: 'name_circle', displayName: 'なまえ工房@日曜 東A-31b', createdAt: '2026-08-10T10:00:00.000Z',
+        hashtags: ['C108'], media: [], url: 'https://x.com/name_circle/status/3001', isRetweet: false,
+    },
+    {
+        id: '3002', text: 'お品書き公開しました #C108',
+        screenName: 'bio_circle', displayName: 'ぷろふ工房',
+        bio: 'C108は 1日目 西け-07a にいます。通販はBOOTHにて。',
+        createdAt: '2026-08-10T09:00:00.000Z',
+        hashtags: ['C108'], media: [], url: 'https://x.com/bio_circle/status/3002', isRetweet: false,
+    },
+];
+const profileSet = buildDataset(profileTweets, {}, 1);
+const fromName = profileSet.circles.find((c) => c.tweetId === '3001');
+const fromBio = profileSet.circles.find((c) => c.tweetId === '3002');
+check('表示名から配置を拾う', fromName?.booths[0]?.display === '2日目 東A-31b', fromName?.booths);
+check('表示名由来は source=name', fromName?.booths[0]?.source === 'name');
+check('プロフィールから配置を拾う', fromBio?.booths[0]?.display === '1日目 西け-07a', fromBio?.booths);
+check('プロフ由来は source=bio', fromBio?.booths[0]?.source === 'bio');
+check('補完件数が stats に出る', profileSet.stats.boothsInherited === 2, profileSet.stats.boothsInherited);
 
 // --- overrides ---
 const patched = buildDataset(tweets, { '1005': { circleName: '手動で直した名前' }, '@rt_sample': { drop: true } }, 1);

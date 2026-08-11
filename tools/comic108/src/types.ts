@@ -35,6 +35,8 @@ export interface NormalizedTweet {
     displayName: string;
     /** 作者头像 */
     avatar?: string;
+    /** プロフィール文。イベント期間中はここに配置を書くサークルが多い */
+    bio?: string;
     createdAt: string;
     hashtags: string[];
     media: Media[];
@@ -65,8 +67,11 @@ export interface Booth {
     /** 归一化后的展示串, 如 "2日目 東A-12b" */
     display: string;
     confidence: Confidence;
-    /** 这条推文本身没写配置, 是从同一账号的其他推文借来的 */
-    inherited?: boolean;
+    /**
+     * 配置をどこから読んだか。未設定 = そのツイート本文から。
+     * 本文に無い場合は 表示名 -> プロフィール -> 同じアカウントの別ツイート の順で探す。
+     */
+    source?: 'name' | 'bio' | 'account';
 }
 
 /** 社团 / サークル 条目 */
@@ -142,7 +147,7 @@ export interface Dataset {
         cosplayers: number;
         unclassified: number;
         overridesApplied: number;
-        /** 同一账号的其他推文里借来的配置数 */
+        /** 本文以外(表示名 / プロフィール / 別ツイート)から補った配置の数 */
         boothsInherited: number;
     };
     circles: Circle[];

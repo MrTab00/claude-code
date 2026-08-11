@@ -38,7 +38,7 @@ export function collectTweetNodes(root: unknown, out = new Map<string, Json>()):
 }
 
 /** 作者信息。X 在 2025 年把 user 的字段从 legacy 挪到了 core, 两边都读 */
-function readUser(node: Json): { screenName: string; displayName: string; avatar?: string } {
+function readUser(node: Json): { screenName: string; displayName: string; avatar?: string; bio?: string } {
     const result = (node.core as Json | undefined)?.user_results as Json | undefined;
     const user = (result?.result ?? {}) as Json;
     const legacy = (user.legacy ?? {}) as Json;
@@ -49,6 +49,7 @@ function readUser(node: Json): { screenName: string; displayName: string; avatar
         screenName: String(core.screen_name ?? legacy.screen_name ?? ''),
         displayName: String(core.name ?? legacy.name ?? ''),
         avatar: (avatarSrc.image_url ?? legacy.profile_image_url_https) as string | undefined,
+        bio: (legacy.description ?? core.description) as string | undefined,
     };
 }
 
@@ -102,6 +103,7 @@ export function normalizeTweet(node: Json): NormalizedTweet | null {
         screenName: user.screenName,
         displayName: user.displayName || user.screenName,
         avatar: user.avatar,
+        bio: user.bio,
         createdAt: legacy.created_at ? new Date(String(legacy.created_at)).toISOString() : '',
         hashtags: readHashtags(node, legacy),
         media: readMedia(legacy),

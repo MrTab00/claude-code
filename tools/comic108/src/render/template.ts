@@ -175,11 +175,17 @@ body {
 .more { align-self: flex-start; background: none; border: 0; color: var(--accent); cursor: pointer; font: 500 12.5px var(--sans); padding: 0; }
 .more:hover { text-decoration: underline; }
 
-.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 5px; }
+/*
+ * お品書きは配置番号や頒価が画像の中に書かれていることが多い。切り抜くと肝心の文字が
+ * 消えるので object-fit は contain 固定、1 枚しかない時はカードの主役として大きく出す。
+ */
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; }
 .shots img {
-  width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px;
+  width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 7px;
   cursor: zoom-in; background: var(--surface-2); border: 1px solid var(--border);
 }
+.shots.one { display: block; }
+.shots.one img { aspect-ratio: auto; max-height: 520px; }
 
 .foot {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -209,6 +215,8 @@ body {
 const JS = String.raw`
 const DATA = JSON.parse(document.getElementById('c108-data').textContent);
 const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]));
+
+const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
 const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false };
 
@@ -250,8 +258,8 @@ function boothHtml(e) {
   if (!bs.length) return '<div class="booth"><span class="b unknown">配置 未取得</span></div>';
   return '<div class="booth">' + bs.map(b =>
     '<span class="b"' + (b.area ? ' data-area="' + esc(b.area) + '"' : '') + '>' + esc(b.display) + '</span>' +
-    (b.inherited
-      ? '<span class="flag" title="このツイート自体には配置が書かれておらず、同じアカウントの別ツイートから引き継ぎました">別ツイートより</span>'
+    (b.source
+      ? '<span class="flag" title="このツイート本文には配置が無く、' + SOURCE_LABEL[b.source] + 'から読み取りました">' + SOURCE_LABEL[b.source] + 'より</span>'
       : b.confidence === 'low' ? '<span class="flag" title="一部しか読み取れていません">要確認</span>' : '')
   ).join('') + '</div>';
 }
@@ -259,7 +267,7 @@ function boothHtml(e) {
 function shotsHtml(e) {
   if (!e.media || !e.media.length) return '';
   // 画像が消えている(削除済み・オフライン)場合は枠ごと隠す。壊れたアイコンを並べても仕方ない
-  return '<div class="shots">' + e.media.map(m =>
+  return '<div class="shots' + (e.media.length === 1 ? ' one' : '') + '">' + e.media.map(m =>
     '<img loading="lazy" onerror="this.remove()" src="' + esc(thumb(m)) + '" data-full="' + esc(full(m)) + '" alt="">'
   ).join('') + '</div>';
 }
@@ -300,8 +308,9 @@ function cardHtml(e) {
   return '<article class="card"' + (area ? ' data-area="' + esc(area) + '"' : '') + '>' +
     (e.kind === 'circle' ? boothHtml(e) : '') +
     whoHtml(e) + tagsHtml(e) +
+    shotsHtml(e) +
     (e.text ? '<div class="body">' + esc(e.text) + '</div><button class="more" type="button">全文を表示</button>' : '') +
-    shotsHtml(e) + footHtml(e) +
+    footHtml(e) +
   '</article>';
 }
 

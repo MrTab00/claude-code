@@ -68,12 +68,11 @@ function applyOverrides<T extends Entry>(entries: T[], overrides: Overrides): { 
 }
 
 /**
- * 同じアカウントの別ツイートから配置を引き継ぐ。
+ * 同じアカウントの別ツイートから配置を引き継ぐ。本文・表示名・プロフィールの
+ * どれからも読めなかった時の最後の手段。
  *
- * 実データで一番多い取りこぼしは「お品書き公開しました！」だけのツイート —— 配置番号は
- * 画像の中にあって本文には無い。ただ同じ人が別のツイートでは本文に配置を書いていることが多いので、
- * アカウント単位で拾い直すと当たりが大きく増える。
- * 借り物なので確度は low に落とし、inherited を立てて UI で区別できるようにする。
+ * 同じ人が別のツイートでは本文に配置を書いていることが多いので、アカウント単位で
+ * 拾い直すと当たりが増える。借り物なので確度は low に落とし、source を立てて UI で区別する。
  */
 function inheritBoothsByAccount(circles: Circle[]): number {
     const known = new Map<string, Circle['booths']>();
@@ -88,7 +87,7 @@ function inheritBoothsByAccount(circles: Circle[]): number {
         if (c.booths.length > 0) continue;
         const source = known.get(c.screenName);
         if (!source) continue;
-        c.booths = source.map((b) => ({ ...b, confidence: 'low' as const, inherited: true }));
+        c.booths = source.map((b) => ({ ...b, confidence: 'low' as const, source: 'account' as const }));
         applied++;
     }
     return applied;
@@ -118,7 +117,10 @@ export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {
         }
     }
 
-    const boothsInherited = inheritBoothsByAccount(circles);
+    const fromAccount = inheritBoothsByAccount(circles);
+    // 表示名 / プロフィール から補ったぶんも同じ統計に数える
+    const fromProfile = circles.filter((c) => c.booths.some((b) => b.source === 'name' || b.source === 'bio')).length;
+    const boothsInherited = fromAccount + fromProfile;
 
     const c = applyOverrides(circles, overrides);
     const p = applyOverrides(cosplayers, overrides);

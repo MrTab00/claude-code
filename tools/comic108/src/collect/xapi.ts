@@ -17,7 +17,7 @@ const ENDPOINT = 'https://api.x.com/2/tweets/search/recent';
 const FIELDS = {
     'tweet.fields': 'created_at,entities,note_tweet,attachments,lang,referenced_tweets',
     expansions: 'author_id,attachments.media_keys',
-    'user.fields': 'username,name,profile_image_url',
+    'user.fields': 'username,name,profile_image_url,description',
     'media.fields': 'url,type,preview_image_url',
     max_results: '100',
 };
@@ -27,6 +27,7 @@ interface ApiUser {
     username: string;
     name: string;
     profile_image_url?: string;
+    description?: string;
 }
 
 interface ApiMedia {
@@ -75,6 +76,7 @@ function toNormalized(tweet: ApiTweet, users: Map<string, ApiUser>, media: Map<s
         screenName: user.username,
         displayName: user.name || user.username,
         avatar: user.profile_image_url,
+        bio: user.description,
         createdAt: tweet.created_at ? new Date(tweet.created_at).toISOString() : '',
         hashtags: (tweet.entities?.hashtags ?? []).map((h) => h.tag),
         media: attached,

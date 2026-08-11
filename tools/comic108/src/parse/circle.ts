@@ -52,9 +52,26 @@ function extractWorks(text: string): string[] {
     return [...works];
 }
 
+/**
+ * 本文に配置が無い時の逃げ道。
+ *
+ * 実データで最も多い取りこぼしは「お品書き公開しました！」だけのツイートで、
+ * 配置番号はお品書き画像の中にしか無い。ただし同人サークルはイベント週になると
+ * 表示名やプロフィールに配置を書くのが通例 —— 「さんぷる工房@日曜東A-12b」のように。
+ * そこは既に採集済みのデータに入っているので、読むだけで拾える。
+ */
+function boothsFromProfile(tweet: NormalizedTweet): Circle['booths'] {
+    const fromName = parseBooths(tweet.displayName).filter((b) => b.confidence === 'high');
+    if (fromName.length) return fromName.map((b) => ({ ...b, source: 'name' as const }));
+
+    const fromBio = parseBooths(tweet.bio ?? '').filter((b) => b.confidence === 'high');
+    return fromBio.map((b) => ({ ...b, source: 'bio' as const }));
+}
+
 export function buildCircle(tweet: NormalizedTweet, dual: boolean): Circle {
     const text = normalize(tweet.text);
     const booths = parseBooths(tweet.text);
+    if (booths.length === 0) booths.push(...boothsFromProfile(tweet));
     const works = extractWorks(text);
     const { name, confidence } = extractCircleName(text, tweet.displayName, works);
     const price = text.match(PRICE);
