@@ -155,6 +155,9 @@ check(
 check('配置マップの枠がある', html.includes('id="mapview"'));
 check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));
 check('詳細パネルの枠がある', html.includes('id="panel"'));
+// hidden 属性が display 指定に負けないこと。ここが崩れるとパネルが開きっぱなしになる
+check('hidden 属性を打ち消す規則がある', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(html));
+check('パネルは hidden で出力される', /<aside id="panel" hidden>/.test(html));
 check('CSV・印刷・持ち出しの導線がある', html.includes('csv-btn') && html.includes('print-btn') && html.includes('export-btn'));
 check('公開向けの断り書きがある', html.includes('site-note') && html.includes('非公式'));
 

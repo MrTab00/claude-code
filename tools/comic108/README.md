@@ -224,6 +224,7 @@ bun run test
 - `test:booth` — 摊位号的全部写法变体
 - `test:pipeline` — fixture 响应 → 提取 → 分类 → 数据集 → HTML 全链路
 - `test:media` — 本地起假图片服务器，验证图片保存、去重、失败回退
+- `test:visibility` — 真实浏览器里按**实际渲染**验证面板/表格/地图的显示与隐藏（不是查属性）
 - `test:collect` — 本地起假的 X 前端，带调试端口拉起真 Chrome，走真实 CDP 验证捕获与落盘
 
 都不需要联网，也不需要 X 账号。`test:collect` 找不到 Chrome 时会自动跳过浏览器部分（可用 `CHROME_PATH` 指定）。

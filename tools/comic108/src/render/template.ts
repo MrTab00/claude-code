@@ -74,6 +74,13 @@ const CSS = `
 :root[data-theme="dark"] {${DARK_TOKENS}}
 
 * { box-sizing: border-box; }
+/*
+ * hidden 属性を最優先にする。
+ * ブラウザ既定の [hidden]{display:none} は特異性が最弱なので、#panel{display:flex} のような
+ * 指定に負けてしまう —— それで詳細パネルが開きっぱなしになっていた。
+ * 個別に打ち消すと同じ穴をまた作るので、ここで一括して止める。
+ */
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
