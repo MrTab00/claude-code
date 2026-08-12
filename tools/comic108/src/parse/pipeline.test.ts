@@ -153,6 +153,10 @@ check(
     ),
 );
 check('配置マップの枠がある', html.includes('id="mapview"'));
+check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));
+check('詳細パネルの枠がある', html.includes('id="panel"'));
+check('CSV・印刷・持ち出しの導線がある', html.includes('csv-btn') && html.includes('print-btn') && html.includes('export-btn'));
+check('公開向けの断り書きがある', html.includes('site-note') && html.includes('非公式'));
 
 console.log(`\nパイプラインテスト: ${checks - failures.length}/${checks} passed\n`);
 if (failures.length) {

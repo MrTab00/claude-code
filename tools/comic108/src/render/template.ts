@@ -244,6 +244,81 @@ body {
 #lightbox.on { display: flex; }
 #lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 
+/* --- チェック状態 --- */
+.marks { display: flex; gap: 4px; flex-wrap: wrap; }
+.mk {
+  appearance: none; cursor: pointer; font: 500 12px var(--sans);
+  padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted);
+}
+.mk[aria-pressed="true"][data-mk="must"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.mk[aria-pressed="true"][data-mk="like"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.mk[aria-pressed="true"][data-mk="skip"] { background: var(--border); color: var(--ink); }
+.mk[aria-pressed="true"][data-mk="buy"]  { background: var(--west-soft); border-color: var(--west); color: var(--west); }
+.card[data-mark="skip"] { opacity: .5; }
+.card[data-mark="must"] { border-color: var(--accent); }
+.card[data-bought="true"] .booth, .card[data-bought="true"] .who { opacity: .75; }
+.flag.new { background: var(--accent-soft); color: var(--accent); }
+
+/* --- 第二ツールバー(道具類) --- */
+.toolbar2 { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-top: -8px; }
+.toolbar2 .spacer { flex: 1; }
+
+/* --- 表ビュー --- */
+.ltable-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.ltable { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ltable th {
+  text-align: left; font: 600 11.5px var(--sans); letter-spacing: .04em; color: var(--muted);
+  padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.ltable td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ltable tr:last-child td { border-bottom: 0; }
+.ltable tbody tr { cursor: pointer; }
+.ltable tbody tr:hover td { background: var(--surface-2); }
+.ltable .b { font-size: 12.5px; padding: 2px 6px; }
+.ltable .st { font-size: 13px; white-space: nowrap; letter-spacing: .1em; }
+.ltable .memo-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.ltable a { color: var(--accent); text-decoration: none; }
+.ltable tr[data-mark="skip"] td { opacity: .5; }
+
+/* --- 詳細パネル --- */
+#backdrop { position: fixed; inset: 0; background: rgba(10,8,9,.45); z-index: 40; }
+#panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw);
+  background: var(--surface); border-left: 1px solid var(--border); z-index: 50;
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+}
+#panel-body { display: flex; flex-direction: column; gap: 12px; }
+#panel .close {
+  position: absolute; top: 10px; right: 12px; appearance: none; border: 0; background: none;
+  font-size: 20px; color: var(--muted); cursor: pointer; line-height: 1; padding: 4px;
+}
+#panel h2 { margin: 0; font-size: 17px; padding-right: 28px; }
+#panel .memo {
+  width: 100%; min-height: 64px; resize: vertical; font: 13.5px/1.5 var(--sans);
+  color: var(--ink); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+}
+#panel .memo::placeholder { color: var(--muted); }
+#panel .post { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+#panel .post time { font-size: 11.5px; color: var(--muted); }
+#panel .post .body { max-height: none; }
+#panel .sec { font: 600 11px var(--sans); letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+
+/* --- フッタ(公開向けの断り書き) --- */
+.site-note { font-size: 11.5px; color: var(--muted); line-height: 1.7; border-top: 1px solid var(--border); padding-top: 14px; }
+.site-note a { color: var(--accent); }
+
+/* --- 印刷: 今の絞り込み・並び順の表だけを出す --- */
+#printtable { display: none; }
+@media print {
+  body * { visibility: hidden; }
+  #printtable, #printtable * { visibility: visible; }
+  #printtable { display: block; position: absolute; inset: 0; padding: 0; }
+  #printtable table { border-collapse: collapse; width: 100%; font: 10.5px/1.4 sans-serif; }
+  #printtable th, #printtable td { border: 1px solid #999; padding: 3px 5px; text-align: left; }
+  #printtable th { background: #eee; }
+}
+
 @media (max-width: 560px) {
   .wrap { padding: 16px 11px 56px; gap: 14px; }
   .grid { grid-template-columns: 1fr; }
@@ -258,7 +333,39 @@ const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]))
 
 const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
-const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false, grouped: true, sort: 'space', cell: null };
+const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false,
+  grouped: true, sort: 'space', cell: null, view: 'cards', markFilter: new Set(), buyFilter: 'all' };
+
+/**
+ * チェック・購入・メモは端末内(localStorage)にだけ保存する。サーバは無い。
+ * key はアカウント名 —— 再採集して build し直してもツイート id が変わるだけで
+ * アカウントは変わらないので、印が生き残る。
+ */
+const STORE_KEY = 'c108-plan-v1';
+const store = (() => {
+  try { return Object.assign({ marks: {}, seen: {}, init: false }, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); }
+  catch { return { marks: {}, seen: {}, init: false }; }
+})();
+function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch {} }
+const markOf = sn => store.marks[sn] || {};
+function setMark(sn, patch) {
+  store.marks[sn] = Object.assign({}, store.marks[sn], patch);
+  const m = store.marks[sn];
+  if (!m.s && !m.b && !m.m) delete store.marks[sn];
+  saveStore();
+}
+
+/** 初回訪問では全部を既読扱いにする —— 全カードに「新着」が付いても意味がない */
+function initSeen(entries) {
+  if (store.init) return;
+  for (const e of entries) {
+    const prev = store.seen[e.screenName];
+    if (!prev || e.createdAt > prev) store.seen[e.screenName] = e.createdAt;
+  }
+  store.init = true;
+  saveStore();
+}
+const isNew = e => store.init && (!store.seen[e.screenName] || e.createdAt > store.seen[e.screenName]);
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 // ローカル保存 > 埋め込み > ホットリンク の順。保存してあれば X 側が消えても残る
@@ -373,6 +480,11 @@ function matches(e) {
     const a = entryAreas(e);
     if (a.length && !a.some(x => state.areas.has(x))) return false;
   }
+
+  const mk = markOf(e.screenName);
+  if (state.markFilter.size && !state.markFilter.has(mk.s)) return false;
+  if (state.buyFilter === 'todo' && mk.b) return false;
+  if (state.buyFilter === 'done' && !mk.b) return false;
   return true;
 }
 
@@ -427,15 +539,45 @@ function footHtml(e) {
   return html + '<a class="src" href="' + esc(e.url) + '" target="_blank" rel="noopener">原文 ↗</a></div>';
 }
 
+const MARK_DEFS = [['must', '★絶対'], ['like', '♡気になる'], ['skip', '⊖見送り'], ['buy', '✓購入済']];
+
+function marksHtml(sn) {
+  const m = markOf(sn);
+  return '<div class="marks" data-sn="' + esc(sn) + '">' + MARK_DEFS.map(([k, label]) =>
+    '<button class="mk" type="button" data-mk="' + k + '" aria-pressed="' +
+    (k === 'buy' ? !!m.b : m.s === k) + '">' + label + '</button>'
+  ).join('') + '</div>';
+}
+
 function cardHtml(e) {
   const area = entryAreas(e)[0];
-  return '<article class="card"' + (area ? ' data-area="' + esc(area) + '"' : '') + '>' +
+  const m = markOf(e.screenName);
+  return '<article class="card" data-sn="' + esc(e.screenName) + '"' +
+    (area ? ' data-area="' + esc(area) + '"' : '') +
+    (m.s ? ' data-mark="' + m.s + '"' : '') + (m.b ? ' data-bought="true"' : '') + '>' +
     (e.kind === 'circle' ? boothHtml(e) : '') +
-    whoHtml(e) + tagsHtml(e) +
+    whoHtml(e) + (isNew(e) ? '<div><span class="flag new">新着</span></div>' : '') + tagsHtml(e) +
     shotsHtml(e) +
     (e.text ? '<div class="body">' + esc(e.text) + '</div><button class="more" type="button">全文を表示</button>' : '') +
+    (m.m ? '<div class="foot">📝 ' + esc(m.m) + '</div>' : '') +
+    marksHtml(e.screenName) +
     footHtml(e) +
   '</article>';
+}
+
+const MARK_ICON = { must: '★', like: '♡', skip: '⊖' };
+
+function rowHtml(e) {
+  const m = markOf(e.screenName);
+  const st = (m.s ? MARK_ICON[m.s] : '') + (m.b ? '✓' : '');
+  return '<tr data-sn="' + esc(e.screenName) + '"' + (m.s ? ' data-mark="' + m.s + '"' : '') + '>' +
+    '<td class="st">' + st + '</td>' +
+    '<td>' + (e.booths || []).map(b => '<span class="b"' + (b.area ? ' data-area="' + esc(b.area) + '"' : '') + '>' + esc(b.display) + '</span>').join(' ') + '</td>' +
+    '<td>' + esc(e.circleName || e.displayName) + ' <a href="https://x.com/' + esc(e.screenName) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">@' + esc(e.screenName) + '</a></td>' +
+    '<td>' + esc(e.price || '') + '</td>' +
+    '<td class="memo-cell">' + esc(m.m || '') + '</td>' +
+    '<td><a href="' + esc(e.url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">原文</a></td>' +
+  '</tr>';
 }
 
 /** タブごとの現在の一覧。グループ化の有無で件数そのものが変わる */
@@ -535,16 +677,117 @@ function render() {
   }
   document.getElementById('area-filter').hidden = state.tab !== 'circles';
 
-  const grid = document.getElementById('grid');
-  grid.innerHTML = list.map(cardHtml).join('');
-  document.getElementById('empty').hidden = list.length > 0;
+  lastList = list;
 
-  // 本文が溢れていなければ「全文を表示」は出さない
-  for (const card of grid.children) {
-    const body = card.querySelector('.body');
-    const more = card.querySelector('.more');
-    if (body && more && body.scrollHeight <= body.clientHeight + 2) more.remove();
+  const grid = document.getElementById('grid');
+  const twrap = document.getElementById('ltable-wrap');
+
+  if (state.view === 'table') {
+    grid.hidden = true;
+    twrap.hidden = false;
+    twrap.innerHTML = '<table class="ltable"><thead><tr>' +
+      '<th>状態</th><th>配置</th><th>サークル</th><th>金額</th><th>メモ</th><th></th>' +
+      '</tr></thead><tbody>' + list.map(rowHtml).join('') + '</tbody></table>';
+  } else {
+    twrap.hidden = true;
+    grid.hidden = false;
+    grid.innerHTML = list.map(cardHtml).join('');
+
+    // 本文が溢れていなければ「全文を表示」は出さない
+    for (const card of grid.children) {
+      const body = card.querySelector('.body');
+      const more = card.querySelector('.more');
+      if (body && more && body.scrollHeight <= body.clientHeight + 2) more.remove();
+    }
   }
+  document.getElementById('empty').hidden = list.length > 0;
+}
+
+let lastList = [];
+
+/** 今の絞り込み・並び順のまま CSV にする(Excel 向けに BOM 付き UTF-8) */
+function buildCsv() {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['状態', '購入済', '日程', '配置', 'サークル名', 'アカウント', '金額', '作品・キャラ', 'メモ', 'URL']];
+  for (const e of lastList) {
+    const m = markOf(e.screenName);
+    rows.push([
+      m.s === 'must' ? '絶対' : m.s === 'like' ? '気になる' : m.s === 'skip' ? '見送り' : '',
+      m.b ? '済' : '',
+      entryDays(e).map(d => d + '日目').join('/'),
+      (e.booths || []).map(b => b.display).join(' / '),
+      e.circleName || e.displayName,
+      '@' + e.screenName,
+      e.price || '',
+      [...(e.works || []), ...(e.characters || [])].join(' / '),
+      m.m || '',
+      e.url,
+    ]);
+  }
+  return '﻿' + rows.map(r => r.map(q).join(',')).join('\r\n');
+}
+
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/** 印刷は常に「今の一覧の表」。カードのまま刷ると画像で紙が尽きる */
+function printList() {
+  const q = esc;
+  document.getElementById('printtable').innerHTML =
+    '<table><thead><tr><th>✓</th><th>状態</th><th>配置</th><th>サークル</th><th>金額</th><th>メモ</th></tr></thead><tbody>' +
+    lastList.map(e => {
+      const m = markOf(e.screenName);
+      return '<tr><td>' + (m.b ? '✓' : '　') + '</td><td>' + (m.s ? { must: '絶対', like: '気になる', skip: '見送り' }[m.s] : '') +
+        '</td><td>' + q((e.booths || []).map(b => b.display).join(' / ')) +
+        '</td><td>' + q(e.circleName || e.displayName) + ' @' + q(e.screenName) +
+        '</td><td>' + q(e.price || '') + '</td><td>' + q(m.m || '') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  window.print();
+}
+
+/** 詳細パネル: そのアカウントの全投稿と、印・メモの編集 */
+function openPanel(sn) {
+  const posts = DATA[state.tab].filter(e => e.screenName === sn)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  if (!posts.length) return;
+  const head = (state.grouped ? rowsFor(state.tab) : posts).find(e => e.screenName === sn) || posts[0];
+  const m = markOf(sn);
+
+  document.getElementById('panel-body').innerHTML =
+    boothHtml(head) +
+    '<h2>' + esc(head.circleName || head.displayName) + '</h2>' +
+    '<div class="who"><a href="https://x.com/' + esc(sn) + '" target="_blank" rel="noopener">@' + esc(sn) + '</a></div>' +
+    marksHtml(sn) +
+    tagsHtml(head) +
+    '<div class="sec">メモ</div>' +
+    '<textarea class="memo" id="panel-memo" placeholder="新刊あり / 無配欲しい / 時間あれば 等">' + esc(m.m || '') + '</textarea>' +
+    '<div class="sec">投稿 (' + posts.length + ')</div>' +
+    posts.map(e =>
+      '<div class="post"><time>' + esc((e.createdAt || '').slice(0, 16).replace('T', ' ')) + '</time>' +
+      shotsHtml(e) +
+      (e.text ? '<div class="body">' + esc(e.text) + '</div>' : '') +
+      '<div class="foot"><a class="src" href="' + esc(e.url) + '" target="_blank" rel="noopener">原文 ↗</a></div></div>'
+    ).join('');
+
+  document.getElementById('panel-memo').addEventListener('input', ev => setMark(sn, { m: ev.target.value }));
+
+  // 開いた時点でこのサークルは既読
+  const latest = posts[0].createdAt;
+  if (!store.seen[sn] || latest > store.seen[sn]) { store.seen[sn] = latest; saveStore(); }
+
+  document.getElementById('panel').hidden = false;
+  document.getElementById('backdrop').hidden = false;
+}
+
+function closePanel() {
+  document.getElementById('panel').hidden = true;
+  document.getElementById('backdrop').hidden = true;
+  render(); // 印やメモの変更をカードに反映
 }
 
 function bindToggle(container, set, isNumber) {
@@ -592,6 +835,98 @@ document.getElementById('media-only').addEventListener('click', ev => {
   render();
 });
 
+// --- 状態で絞る ---
+document.getElementById('mark-filter').addEventListener('click', ev => {
+  const chip = ev.target.closest('.chip');
+  if (!chip) return;
+  const v = chip.dataset.value;
+  if (state.markFilter.has(v)) state.markFilter.delete(v); else state.markFilter.add(v);
+  chip.setAttribute('aria-pressed', String(state.markFilter.has(v)));
+  render();
+});
+
+// --- 購入で絞る(すべて → 未購入 → 購入済 の三段循環) ---
+document.getElementById('buy-filter').addEventListener('click', ev => {
+  state.buyFilter = state.buyFilter === 'all' ? 'todo' : state.buyFilter === 'todo' ? 'done' : 'all';
+  ev.currentTarget.textContent = { all: '購入: すべて', todo: '未購入だけ', done: '購入済だけ' }[state.buyFilter];
+  ev.currentTarget.setAttribute('aria-pressed', String(state.buyFilter !== 'all'));
+  render();
+});
+
+document.getElementById('view-toggle').addEventListener('click', ev => {
+  state.view = state.view === 'cards' ? 'table' : 'cards';
+  ev.currentTarget.textContent = state.view === 'cards' ? '表で見る' : 'カードで見る';
+  render();
+});
+
+document.getElementById('csv-btn').addEventListener('click', () =>
+  download('c108-list.csv', buildCsv(), 'text/csv;charset=utf-8'));
+document.getElementById('print-btn').addEventListener('click', printList);
+
+// --- チェックの持ち出し / 読み込み(端末間の移動はファイルで。サーバは無い) ---
+document.getElementById('export-btn').addEventListener('click', () =>
+  download('c108-checklist.json', JSON.stringify({ marks: store.marks, seen: store.seen }, null, 1), 'application/json'));
+document.getElementById('import-file').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    Object.assign(store.marks, data.marks || {});
+    for (const [sn, at] of Object.entries(data.seen || {})) {
+      if (!store.seen[sn] || at > store.seen[sn]) store.seen[sn] = at;
+    }
+    saveStore();
+    render();
+    document.getElementById('import-btn').textContent = '読み込みました ✓';
+    setTimeout(() => { document.getElementById('import-btn').textContent = 'チェックを読み込む'; }, 2000);
+  } catch (err) {
+    alert('読み込めませんでした: ' + err.message);
+  }
+  ev.target.value = '';
+});
+document.getElementById('import-btn').addEventListener('click', () =>
+  document.getElementById('import-file').click());
+
+document.getElementById('read-all-btn').addEventListener('click', () => {
+  for (const tab of ['circles', 'cosplayers', 'unclassified']) {
+    for (const e of DATA[tab]) {
+      if (!store.seen[e.screenName] || e.createdAt > store.seen[e.screenName]) store.seen[e.screenName] = e.createdAt;
+    }
+  }
+  saveStore();
+  render();
+});
+
+/** 印ボタンの共通処理。カード・表・パネルのどこから押しても同じ */
+function handleMark(ev) {
+  const mk = ev.target.closest('.mk');
+  if (!mk) return false;
+  const sn = mk.closest('[data-sn]').dataset.sn;
+  const kind = mk.dataset.mk;
+  const m = markOf(sn);
+  if (kind === 'buy') setMark(sn, { b: !m.b });
+  else setMark(sn, { s: m.s === kind ? undefined : kind });
+
+  // パネルが開いていれば中のボタン表示も揃える
+  const panel = document.getElementById('panel');
+  if (!panel.hidden) {
+    const row = panel.querySelector('.marks');
+    if (row && row.dataset.sn === sn) row.outerHTML = marksHtml(sn);
+  }
+  if (mk.closest('#panel')) return true; // パネル内は再描画しない(メモ入力中に消えると困る)
+  render();
+  return true;
+}
+
+document.getElementById('panel').addEventListener('click', ev => { handleMark(ev); });
+document.getElementById('panel').querySelector('.close').addEventListener('click', closePanel);
+document.getElementById('backdrop').addEventListener('click', closePanel);
+document.getElementById('ltable-wrap').addEventListener('click', ev => {
+  if (handleMark(ev)) return;
+  const row = ev.target.closest('tr[data-sn]');
+  if (row) openPanel(row.dataset.sn);
+});
+
 document.getElementById('mapview').addEventListener('click', ev => {
   if (ev.target.closest('.clear')) { state.cell = null; render(); return; }
   const cell = ev.target.closest('.cell');
@@ -609,6 +944,7 @@ document.getElementById('mapview').addEventListener('click', ev => {
 
 const lightbox = document.getElementById('lightbox');
 document.getElementById('grid').addEventListener('click', ev => {
+  if (handleMark(ev)) return;
   if (ev.target.matches('.more')) {
     const body = ev.target.previousElementSibling;
     body.classList.toggle('open');
@@ -618,11 +954,28 @@ document.getElementById('grid').addEventListener('click', ev => {
   if (ev.target.tagName === 'IMG') {
     lightbox.querySelector('img').src = ev.target.dataset.full;
     lightbox.classList.add('on');
+    return;
+  }
+  if (ev.target.closest('a')) return;
+  const card = ev.target.closest('.card[data-sn]');
+  if (card) openPanel(card.dataset.sn);
+});
+
+// パネル内の画像もライトボックスで拡大できる
+document.getElementById('panel').addEventListener('click', ev => {
+  if (ev.target.tagName === 'IMG' && ev.target.dataset.full) {
+    lightbox.querySelector('img').src = ev.target.dataset.full;
+    lightbox.classList.add('on');
   }
 });
 lightbox.addEventListener('click', () => lightbox.classList.remove('on'));
-document.addEventListener('keydown', ev => { if (ev.key === 'Escape') lightbox.classList.remove('on'); });
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape') return;
+  if (lightbox.classList.contains('on')) { lightbox.classList.remove('on'); return; }
+  if (!document.getElementById('panel').hidden) closePanel();
+});
 
+initSeen([...DATA.circles, ...DATA.cosplayers, ...DATA.unclassified]);
 render();
 `;
 
@@ -668,12 +1021,28 @@ export function renderHtml(dataset: Dataset): string {
       <button class="chip" type="button" data-value="西" aria-pressed="false">西</button>
       <button class="chip" type="button" data-value="南" aria-pressed="false">南</button>
     </div>
+    <div class="chips" id="mark-filter">
+      <button class="chip" type="button" data-value="must" aria-pressed="false">★絶対</button>
+      <button class="chip" type="button" data-value="like" aria-pressed="false">♡気になる</button>
+    </div>
     <div class="chips">
+      <button class="chip" type="button" id="buy-filter" aria-pressed="false">購入: すべて</button>
       <button class="chip" type="button" id="sort-toggle" data-sort="space">配置順</button>
       <button class="chip" type="button" id="group-toggle" aria-pressed="true">サークル単位</button>
       <button class="chip" type="button" id="media-only" aria-pressed="false">画像あり</button>
     </div>
     <span class="count" id="count"></span>
+  </div>
+
+  <div class="toolbar2">
+    <button class="chip" type="button" id="view-toggle">表で見る</button>
+    <span class="spacer"></span>
+    <button class="chip" type="button" id="csv-btn" title="今の絞り込み・並び順で書き出します">CSV</button>
+    <button class="chip" type="button" id="print-btn" title="今の絞り込み・並び順で印刷します">印刷</button>
+    <button class="chip" type="button" id="export-btn" title="チェック・メモをファイルに書き出して別の端末へ">チェックを書き出す</button>
+    <button class="chip" type="button" id="import-btn">チェックを読み込む</button>
+    <input type="file" id="import-file" accept="application/json" hidden>
+    <button class="chip" type="button" id="read-all-btn" title="「新着」の印をすべて消します">すべて既読にする</button>
   </div>
 
   <section class="mapview" id="mapview" hidden>
@@ -687,8 +1056,25 @@ export function renderHtml(dataset: Dataset): string {
   </section>
 
   <div class="grid" id="grid"></div>
+  <div class="ltable-wrap" id="ltable-wrap" hidden></div>
   <div class="empty" id="empty" hidden>条件に合う項目がありません</div>
+
+  <footer class="site-note">
+    非公式のファンメイドツールです。コミックマーケット準備会および各サークルとは一切関係ありません。
+    配置・頒布情報は X の投稿から機械的に抽出したもので、正確性は保証されません —
+    必ず <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">公式Webカタログ</a> 等でご確認ください。
+    画像・本文の権利は各投稿者に帰属します。当ページは X 上の原ツイートを参照表示するだけで保存はしておらず、
+    原ツイートが削除されると表示されなくなります。
+    チェック・メモはお使いのブラウザ内(localStorage)にのみ保存され、どこにも送信されません。
+  </footer>
 </div>
+
+<aside id="panel" hidden>
+  <button class="close" type="button" aria-label="閉じる">✕</button>
+  <div id="panel-body"></div>
+</aside>
+<div id="backdrop" hidden></div>
+<div id="printtable"></div>
 
 <div id="lightbox"><img alt=""></div>
 
