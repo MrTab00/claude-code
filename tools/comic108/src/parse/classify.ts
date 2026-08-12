@@ -3,7 +3,7 @@
  */
 
 import { circleSignals, cosplaySignals, event } from '../../config';
-import type { Circle, Cosplayer, Dataset, Entry, NormalizedTweet, Overrides, Unclassified } from '../types';
+import type { Circle, Cosplayer, Dataset, Entry, NormalizedTweet, Overrides } from '../types';
 import { hasBooth, normalize } from './booth';
 import { buildCircle } from './circle';
 import { buildCosplayer } from './cosplay';
@@ -20,19 +20,6 @@ export function classify(tweet: NormalizedTweet): Kind {
     if (isCircle) return 'circle';
     if (isCosplay) return 'cosplayer';
     return 'none';
-}
-
-function buildUnclassified(tweet: NormalizedTweet): Unclassified {
-    return {
-        kind: 'unclassified',
-        tweetId: tweet.id,
-        screenName: tweet.screenName,
-        displayName: tweet.displayName,
-        text: tweet.text,
-        media: tweet.media,
-        url: tweet.url,
-        createdAt: tweet.createdAt,
-    };
 }
 
 /**
@@ -97,7 +84,10 @@ function inheritBoothsByAccount(circles: Circle[]): number {
 export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {}, rawCaptures = 0): Dataset {
     const circles: Circle[] = [];
     const cosplayers: Cosplayer[] = [];
-    const unclassified: Unclassified[] = [];
+    // サークルでもレイヤーでもないツイートは数えるだけで捨てる。
+    // 以前は「未分類」として全部載せていたが、実データでは 400 件超が
+    // 「暑いですね」の類で、読む価値のあるものが 1 件も無かった。
+    let dropped = 0;
 
     for (const tweet of tweets) {
         switch (classify(tweet)) {
@@ -113,7 +103,7 @@ export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {
                 cosplayers.push(buildCosplayer(tweet, true));
                 break;
             default:
-                unclassified.push(buildUnclassified(tweet));
+                dropped++;
         }
     }
 
@@ -124,7 +114,6 @@ export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {
 
     const c = applyOverrides(circles, overrides);
     const p = applyOverrides(cosplayers, overrides);
-    const u = applyOverrides(unclassified, overrides);
 
     return {
         generatedAt: new Date().toISOString(),
@@ -134,12 +123,11 @@ export function buildDataset(tweets: NormalizedTweet[], overrides: Overrides = {
             tweets: tweets.length,
             circles: c.entries.length,
             cosplayers: p.entries.length,
-            unclassified: u.entries.length,
-            overridesApplied: c.applied + p.applied + u.applied,
+            dropped,
+            overridesApplied: c.applied + p.applied,
             boothsInherited,
         },
         circles: c.entries,
         cosplayers: p.entries,
-        unclassified: u.entries,
     };
 }

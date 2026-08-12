@@ -39,5 +39,5 @@ await writeFile(paths.html, renderHtml(dataset), 'utf8');
 const { size } = await stat(paths.html);
 console.log(`
 出力完了: ${paths.html}
-  ${(size / 1024).toFixed(0)} KB · サークル ${dataset.stats.circles} 件 / コスプレ ${dataset.stats.cosplayers} 件 / 未分類 ${dataset.stats.unclassified} 件
+  ${(size / 1024).toFixed(0)} KB · サークル ${dataset.stats.circles} 件 / コスプレ ${dataset.stats.cosplayers} 件
 `);

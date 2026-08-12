@@ -1,7 +1,7 @@
 /**
  * C108 情报工具的数据结构定义。
  *
- * 数据流: RawCapture -> NormalizedTweet -> (Circle | Cosplayer | Unclassified) -> Dataset -> HTML
+ * 数据流: RawCapture -> NormalizedTweet -> (Circle | Cosplayer) -> Dataset -> HTML
  *
  * 每一层都保留上一层的引用(tweetId), 所以任何一条结论都能追回原始推文。
  */
@@ -123,19 +123,7 @@ export interface Cosplayer {
     dual: boolean;
 }
 
-/** 两边都没命中的推文, 单列一个 Tab 供人工扫 */
-export interface Unclassified {
-    kind: 'unclassified';
-    tweetId: string;
-    screenName: string;
-    displayName: string;
-    text: string;
-    media: Media[];
-    url: string;
-    createdAt: string;
-}
-
-export type Entry = Circle | Cosplayer | Unclassified;
+export type Entry = Circle | Cosplayer;
 
 /** parse 阶段的产物, 也是 render 阶段的输入 */
 export interface Dataset {
@@ -149,14 +137,14 @@ export interface Dataset {
         tweets: number;
         circles: number;
         cosplayers: number;
-        unclassified: number;
+        /** サークルでもレイヤーでもないと判定して捨てたツイート数。診断用で、成果物には出さない */
+        dropped: number;
         overridesApplied: number;
         /** 本文以外(表示名 / プロフィール / 別ツイート)から補った配置の数 */
         boothsInherited: number;
     };
     circles: Circle[];
     cosplayers: Cosplayer[];
-    unclassified: Unclassified[];
 }
 
 /**

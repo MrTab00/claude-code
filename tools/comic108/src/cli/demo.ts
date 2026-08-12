@@ -23,6 +23,6 @@ await writeFile(out, renderHtml(dataset), 'utf8');
 
 console.log(`
 サンプル出力: ${out}
-  サークル ${dataset.stats.circles} 件 / コスプレ ${dataset.stats.cosplayers} 件 / 未分類 ${dataset.stats.unclassified} 件
+  サークル ${dataset.stats.circles} 件 / コスプレ ${dataset.stats.cosplayers} 件
   ※ 画像は実在しないダミー URL なので表示されません
 `);

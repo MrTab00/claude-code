@@ -87,7 +87,7 @@ console.log(`
   ツイート      ${tweets.length} 件
   サークル系    ${dataset.circles.length} 件
   コスプレ系    ${dataset.cosplayers.length} 件
-  未分類        ${dataset.unclassified.length} 件
+  対象外        ${dataset.stats.dropped} 件
 
 === 配置の取得元 ===
   合計          ${withBooth.length} / ${dataset.circles.length} 件${pct(withBooth.length)}

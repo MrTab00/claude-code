@@ -8,7 +8,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { renderHtml } from '../render/template';
-import { VENUE } from '../render/venue';
 import { buildDataset } from './classify';
 import { extractTweets } from './extract';
 
@@ -45,7 +44,9 @@ const dataset = buildDataset(tweets, {}, 1);
 
 check('サークル 3 件', dataset.stats.circles === 3, dataset.circles.map((c) => c.screenName));
 check('コスプレ 2 件', dataset.stats.cosplayers === 2, dataset.cosplayers.map((c) => c.screenName));
-check('未分類 1 件', dataset.stats.unclassified === 1, dataset.unclassified.map((c) => c.screenName));
+// サークルでもレイヤーでもないツイートは数えるだけで捨てる。成果物には出さない
+check('対象外は捨てて数だけ残す', dataset.stats.dropped === 1, dataset.stats.dropped);
+check('データセットに未分類の入れ物が無い', !('unclassified' in dataset), Object.keys(dataset));
 
 const circle = dataset.circles.find((c) => c.tweetId === '1001')!;
 check('配置 2日目 東A-12b', circle?.booths[0]?.display === '2日目 東A-12b', circle?.booths[0]);
@@ -134,12 +135,11 @@ check('優先した配置は source=name', upgraded?.booths[0]?.source === 'name
 check('部分的な本文の配置は残さない', upgraded?.booths.length === 1, upgraded?.booths);
 
 // --- overrides ---
-const patched = buildDataset(tweets, { '1005': { circleName: '手動で直した名前' }, '@rt_sample': { drop: true } }, 1);
+const patched = buildDataset(tweets, { '1001': { circleName: '手動で直した名前' }, '@rt_sample': { drop: true } }, 1);
 check('overrides が適用される', patched.stats.overridesApplied >= 1, patched.stats.overridesApplied);
-check(
-    'overrides で名前を上書きできる',
-    patched.unclassified.length === 1 || dataset.unclassified.length === 1,
-);
+check('overrides で名前を上書きできる',
+    patched.circles.some((c) => c.circleName === '手動で直した名前'),
+    patched.circles.map((c) => c.circleName));
 
 // --- レンダリング ---
 const html = renderHtml(dataset);

@@ -15,7 +15,7 @@ import { renderHtml } from './template';
 const CONCURRENCY = 6;
 
 function allPhotos(dataset: Dataset): Media[] {
-    return [...dataset.circles, ...dataset.cosplayers, ...dataset.unclassified]
+    return [...dataset.circles, ...dataset.cosplayers]
         .flatMap((e) => e.media)
         .filter((m) => m.type === 'photo');
 }

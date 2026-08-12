@@ -935,7 +935,7 @@ function render() {
   document.getElementById('count').textContent =
     list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
 
-  for (const t of ['circles', 'cosplayers', 'unclassified']) {
+  for (const t of ['circles', 'cosplayers']) {
     const n = rowsFor(t).length;
     const badge = document.querySelector('.tab[data-tab="' + t + '"] .n');
     if (badge) badge.textContent = n;
@@ -1059,7 +1059,7 @@ function printList() {
 function openPanel(sn) {
   // タブに関係なく開けるようにする。地図タブでは DATA['map'] などという配列は無いし、
   // サークル兼レイヤーはどちらの一覧からでも開かれうる
-  const kind = ['circles', 'cosplayers', 'unclassified'].find(k => DATA[k].some(e => e.screenName === sn));
+  const kind = ['circles', 'cosplayers'].find(k => DATA[k].some(e => e.screenName === sn));
   if (!kind) return;
   const posts = DATA[kind].filter(e => e.screenName === sn)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -1204,7 +1204,7 @@ document.getElementById('import-btn').addEventListener('click', () =>
   document.getElementById('import-file').click());
 
 document.getElementById('read-all-btn').addEventListener('click', () => {
-  for (const tab of ['circles', 'cosplayers', 'unclassified']) {
+  for (const tab of ['circles', 'cosplayers']) {
     for (const e of DATA[tab]) {
       if (!store.seen[e.screenName] || e.createdAt > store.seen[e.screenName]) store.seen[e.screenName] = e.createdAt;
     }
@@ -1373,7 +1373,7 @@ new IntersectionObserver(entries => {
   if (entries.some(e => e.isIntersecting)) appendChunk();
 }, { rootMargin: '600px' }).observe(document.getElementById('more-sentinel'));
 
-initSeen([...DATA.circles, ...DATA.cosplayers, ...DATA.unclassified]);
+initSeen([...DATA.circles, ...DATA.cosplayers]);
 render();
 fitZoom();
 // フォントが差し替わると地図の実寸が数 px 変わる。落ち着いてからもう一度測って合わせ直す
@@ -1409,7 +1409,6 @@ export function renderHtml(dataset: Dataset): string {
     <div class="summary">
       <div class="stat"><b id="stat-circles">${stats.circles}</b><span>サークル</span></div>
       <div class="stat"><b id="stat-cosplayers">${stats.cosplayers}</b><span>コスプレイヤー</span></div>
-      <div class="stat"><b id="stat-unclassified">${stats.unclassified}</b><span>未分類</span></div>
       <div class="stat"><b>${stats.tweets}</b><span>ツイートから</span></div>
     </div>
     <div class="gen">生成 ${new Date(generatedAt).toLocaleString('ja-JP')}${stats.overridesApplied ? ` · 人工修正 ${stats.overridesApplied} 件適用` : ''}</div>
@@ -1419,7 +1418,6 @@ export function renderHtml(dataset: Dataset): string {
     <button class="tab" type="button" role="tab" data-tab="map" aria-selected="true">地図</button>
     <button class="tab" type="button" role="tab" data-tab="circles" aria-selected="false">サークル<span class="n">${stats.circles}</span></button>
     <button class="tab" type="button" role="tab" data-tab="cosplayers" aria-selected="false">コスプレイヤー<span class="n">${stats.cosplayers}</span></button>
-    <button class="tab" type="button" role="tab" data-tab="unclassified" aria-selected="false">未分類<span class="n">${stats.unclassified}</span></button>
   </nav>
 
   <div class="toolbar">

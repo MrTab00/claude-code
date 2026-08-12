@@ -84,7 +84,7 @@ console.log(`
   推文       ${stats.tweets} 件
   社団       ${stats.circles} 件
   コスプレ   ${stats.cosplayers} 件
-  未分類     ${stats.unclassified} 件
+  対象外     ${stats.dropped} 件(サークルでもレイヤーでもないツイート。成果物には出ない)
   人工修正   ${stats.overridesApplied} 件適用
 
   -> ${paths.dataset}
