@@ -227,6 +227,45 @@ body {
 .island.wall > .blk { writing-mode: horizontal-tb; }
 /* 段の枠。短い島をその段の中で通路側に寄せるためだけのもの */
 .bandslot { display: flex; }
+
+/*
+ * 企業ブース。ブロック記号が無く番号だけなので、島ではなく番号のまとまりで並べる。
+ * 番号は飛び飛び(1111 の次が 1121)なので連番のマスは作らず、実在する番号だけ置く。
+ */
+/* 伸ばさない。親が縦に広いと、マスがその高さいっぱいまで引き伸ばされてしまう */
+.cgroups { --cbw: calc(var(--sw) * 1.15); display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+.cgroup { display: flex; flex-direction: column; gap: 3px; }
+.cgroup > .glabel { font: 700 9px var(--sans); color: var(--muted); }
+/* 配置図の企業ブースは横長。折り返しを狭くすると縦に伸びて全体表示が小さくなる */
+/*
+ * grid にしてある。flex-wrap だと行の高さが揃えられてマスが縦に伸び、
+ * 配置図と似ても似つかない縦長の箱になる。grid の行は中身の高さに合う。
+ */
+.cbooths {
+  display: grid; gap: 3px; align-content: start; justify-content: start;
+  grid-template-columns: repeat(auto-fill, var(--cbw));
+  width: calc((var(--cbw) + 3px) * 12);
+}
+.cb {
+  appearance: none; border: 1px solid var(--border); border-radius: 2px; padding: 1px 3px; margin: 0;
+  /* align-self を明示しないと grid の行いっぱいに引き伸ばされ、縦長の箱になる */
+  align-self: start; width: var(--cbw); height: calc(var(--sh) * 2); overflow: hidden;
+  background: var(--island); color: var(--muted); cursor: pointer;
+  font: 600 7px/1.25 var(--sans); display: flex; flex-direction: column; align-items: flex-start;
+  touch-action: manipulation;
+}
+.cb.vacant { cursor: default; }
+.cb .nm { display: none; white-space: nowrap; }
+.cb:not(.vacant) { background: var(--west-soft); color: var(--west); border-color: var(--west); }
+.cb:not(.vacant)[data-area="南"] { background: var(--south-soft); color: var(--south); border-color: var(--south); }
+.cb[data-mark="must"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.cb[data-mark="like"] { border-width: 2px; }
+.cb[data-mark="skip"] { opacity: .35; }
+/* 拡大したらサークル名も出す。縮小時は番号すら読めないので枠だけ */
+.mapcanvas[data-detail="2"] .cb .nm { display: block; }
+.mapcanvas[data-detail="2"] .cgroups { --cbw: calc(var(--sw) * 2.6); }
+.mapcanvas[data-detail="2"] .cb { height: calc(var(--sh) * 3.2); }
+.mapcanvas[data-detail="0"] .cb { font-size: 0; padding: 0; height: var(--sh); }
 /*
  * 島は 2 列。空きスペースは背景の線で描くので要素を作らない ——
  * 800 サークル規模で 6000 個の空マスを置くと重すぎる。
@@ -455,7 +494,12 @@ const BLOCK_OF = __BLOCK_OF__;
 
 /** ツイートの配置を公式表記に揃える。揃わないものは null(構成表に無いブロック) */
 function official(b) {
-  if (!b || !b.block || !b.area) return null;
+  if (!b || !b.area) return null;
+  // 企業ブースはブロック記号が無く、番号そのものが場所。解析時にホールまで引いてある
+  if (b.kind === 'company') {
+    return b.hall ? { area: b.area, hall: b.hall, block: null, company: b.number } : null;
+  }
+  if (!b.block) return null;
   const key = b.area + '/' + String(b.block).toLowerCase();
   const hall = HALL_OF[key];
   return hall ? { area: b.area, hall, block: BLOCK_OF[key] } : null;
@@ -721,7 +765,9 @@ function buildSpaceIndex(rows) {
         if (b.block && b.area) strays.set(b.area + '/' + b.block, (strays.get(b.area + '/' + b.block) || 0) + 1);
         continue;
       }
-      const key = o.area + '/' + o.hall + '/' + o.block + '/' + (b.number ?? 0);
+      const key = o.company
+        ? 'C/' + o.area + '/' + o.hall + '/' + o.company
+        : o.area + '/' + o.hall + '/' + o.block + '/' + (b.number ?? 0);
       if (!spaces.has(key)) spaces.set(key, []);
       const at = spaces.get(key);
       if (!at.some(x => x.screenName === e.screenName)) at.push(e);
@@ -812,6 +858,32 @@ function islandHtml(area, hallNo, island, slots, letterAfter, spaces, isWall) {
   return '<div class="island' + (isWall ? ' wall' : '') + '">' + body + '</div>';
 }
 
+/**
+ * 企業ブースのホール。ブロック記号が無いので、番号のまとまりごとに並べるだけ。
+ * 空いているマスを作らない —— 番号は飛び飛び(1111 の次が 1121)なので、
+ * 連番として敷き詰めると実在しない場所を大量に描くことになる。
+ */
+function companyHallHtml(area, hall, spaces) {
+  const groups = hall.groups.map(g => {
+    const cells = g.booths.map(n => {
+      const at = spaces.get('C/' + area + '/' + hall.hall + '/' + n);
+      if (!at || !at.length) return '<span class="cb vacant">' + n + '</span>';
+      const names = at.map(e => e.circleName || e.displayName);
+      const mark = markOf(at[0].screenName).s;
+      return '<button class="cb" type="button" data-area="' + esc(area) + '"' +
+        (mark ? ' data-mark="' + mark + '"' : '') +
+        ' data-sn="' + esc(at[0].screenName) + '"' +
+        ' title="' + esc(area + hall.hall + ' ' + n + '  ' + names.join(' / ')) + '">' +
+        '<span class="num">' + n + '</span><span class="nm">' + esc(names.join('/')) + '</span></button>';
+    }).join('');
+    return '<div class="cgroup">' + (g.label ? '<span class="glabel">' + esc(g.label) + '</span>' : '') +
+      '<div class="cbooths">' + cells + '</div></div>';
+  }).join('');
+
+  return '<div class="mhall" data-area="' + esc(area) + '"><span class="name">' + esc(area + hall.hall) +
+         'ホール</span><div class="cgroups">' + groups + '</div></div>';
+}
+
 /** ホール 1 つ。段 → 通路で区切られたまとまり → 島、の順に組む */
 function hallHtml(area, hall, spaces) {
   const sections = hall.sections.map(sec => {
@@ -851,7 +923,9 @@ function renderMap(rows) {
     if (!shown.length) continue;
     html += '<div class="frow">' + shown.map(b =>
       '<div class="bldg" data-area="' + esc(b.area) + '" data-id="' + esc(b.id) + '">' +
-      '<div class="bhalls">' + b.halls.map(h => hallHtml(b.area, h, spaces)).join('') + '</div></div>'
+      '<div class="bhalls">' + (b.companies
+        ? b.companies.map(h => companyHallHtml(b.area, h, spaces)).join('')
+        : b.halls.map(h => hallHtml(b.area, h, spaces)).join('')) + '</div></div>'
     ).join('') + '</div>';
   }
 
@@ -919,7 +993,9 @@ function fitZoom() {
   const pad = 4;
   const byW = natural.w ? (scroll.clientWidth - pad) / natural.w : 1;
   const byH = natural.h ? (scroll.clientHeight - pad) / natural.h : 1;
-  applyZoom(Math.min(byW, byH));
+  // 「全体」は縮めるためのもの。小さい棟だけを出したときに引き伸ばすと、
+  // マスばかり大きくなって一度に見える範囲がかえって狭くなる
+  applyZoom(Math.min(1, byW, byH));
   scroll.scrollTo(0, 0);
 }
 

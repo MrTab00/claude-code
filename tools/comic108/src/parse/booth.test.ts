@@ -186,6 +186,31 @@ const cases: Case[] = [
         input: '新刊は 12 b 500円です',
         expect: null,
     },
+    // --- 企業ブース。企業ブースパンフレット (2026 SUMMER) から ---
+    {
+        name: '企業ブース 西4-1933(番号のほうを信じる: 1933 は構成表では西3)',
+        input: 'ぶりきやさん（仮）@コミケC108企業ブース西4-1933',
+        expect: { kind: 'company', area: '西', hall: '3', number: 1933, block: null, confidence: 'high' },
+    },
+    {
+        name: '企業ブース 南3ホール・2213',
+        input: '山善は南3ホール・2213です。是非遊びに来て下さい #C108',
+        expect: { kind: 'company', area: '南', hall: '3', number: 2213, confidence: 'high' },
+    },
+    {
+        name: '企業ブース No. 付き 西3ホール No.1222',
+        input: 'メロンブックス 西3ホール No.1222',
+        expect: { kind: 'company', area: '西', hall: '3', number: 1222, confidence: 'high' },
+    },
+    {
+        name: 'ガールズエリアの 3 桁番号 南3 914',
+        input: 'ガールズエリア 南3 914 サクラフルーツパレット',
+        expect: { kind: 'company', area: '南', hall: '3', number: 914, confidence: 'high' },
+    },
+    // 構成表に無い数字を配置と取り違えない。年号も値段もいくらでも出てくる
+    { name: '年号を企業ブースと取り違えない', input: 'コミケ108は2026年開催です', expect: null },
+    { name: '値段を企業ブースと取り違えない', input: '新刊1000円、既刊500円です', expect: null },
+    { name: '地区が無い裸の番号は拾わない', input: 'いよいよ1222まで来ました', expect: null },
 ];
 
 let passed = 0;

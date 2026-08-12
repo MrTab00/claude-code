@@ -50,6 +50,20 @@ export interface Hall {
     wall?: Wall;
 }
 
+/**
+ * 企業ブースのホール。
+ *
+ * サークルのホールと作りが違う: ブロック記号が無く、4 桁(ガールズエリアだけ 3 桁)の
+ * 番号だけで場所が決まる。番号自体が場所を表していて、
+ *   1 桁目 1=西 / 2=南、2 桁目が島、3 桁目が列、4 桁目がその中の位置。
+ * 島の形までは配置図から起こしていないので、番号のまとまりごとに並べるだけにしてある。
+ */
+export interface CompanyHall {
+    hall: string;
+    /** 通路で分かれたまとまり。番号は企業ブースパンフレットの地図の並びそのまま */
+    groups: { label?: string; booths: number[] }[];
+}
+
 /** 1 棟。中の仕切りがホール。地図の絞り込みもこの単位 */
 export interface Building {
     /** 絞り込みの鍵。チップの文字にもなる */
@@ -57,6 +71,8 @@ export interface Building {
     area: Area;
     /** 左→右の並び */
     halls: Hall[];
+    /** 企業ブースの棟。halls とはどちらか一方だけを持つ */
+    companies?: CompanyHall[];
 }
 
 /** 棟の横並び 1 段。会場を真上から見たときの並びそのもの */
@@ -190,8 +206,52 @@ const south2: Hall = {
     wall: { block: 'a', spaces: 54, side: 'right' },
 };
 
+
+/*
+ * 企業ブース。企業ブースパンフレット (2026 SUMMER) の地図から起こした。
+ * 西展示棟 3・4ホールと南展示棟 3・4ホールの 4F、122 社。
+ * ガールズエリア(女性向け中心)は南3ホールの中の一区画で、そこだけ番号が 3 桁。
+ *
+ * 番号のまとまり(11xx / 12xx …)が島に当たる。島の細かな形までは起こしていない。
+ */
+const west3: CompanyHall = {
+    hall: '3',
+    groups: [
+        { booths: [1111, 1121, 1122, 1123, 1124, 1125, 1131, 1132, 1133, 1134, 1141, 1142, 1151, 1161, 1171] },
+        { booths: [1211, 1221, 1222, 1223, 1224, 1225, 1226, 1231, 1232, 1233, 1241, 1251, 1252] },
+        { booths: [1311, 1312, 1313, 1321, 1322, 1323, 1331, 1332, 1333, 1341, 1342, 1343, 1351] },
+        { booths: [1911, 1912, 1913, 1914, 1921, 1922, 1923, 1931, 1932, 1933, 1934, 1941, 1942, 1943] },
+    ],
+};
+
+const west4: CompanyHall = {
+    hall: '4',
+    groups: [{ booths: [1411, 1412, 1413, 1414, 1421, 1422, 1423, 1424, 1431, 1432, 1433, 1441, 1442, 1443, 1451] }],
+};
+
+const south3: CompanyHall = {
+    hall: '3',
+    groups: [
+        { label: 'ガールズエリア', booths: [111, 112, 121, 122, 911, 912, 913, 914] },
+        { booths: [2141, 2142, 2143] },
+        { booths: [2211, 2212, 2213, 2221, 2222, 2223, 2231, 2241] },
+        { booths: [2311, 2321, 2322, 2323, 2324, 2331, 2341, 2342, 2343] },
+        { booths: [2911, 2912, 2913, 2921, 2922] },
+    ],
+};
+
+const south4: CompanyHall = {
+    hall: '4',
+    groups: [
+        { booths: [2411, 2421, 2431, 2441, 2442, 2443, 2444, 2445, 2446] },
+        { booths: [2511, 2521, 2522, 2531, 2532, 2533, 2534, 2541] },
+        { booths: [2621, 2641] },
+    ],
+};
+
 /**
  * 棟の並び。東1・2・3 が上段いっぱい、その下に 東7 と 西 が横並び、いちばん下が 南。
+ * 企業ブースは西・南の 4F にあるので、サークルの棟とは別の段に置く。
  * 東1〜3 / 西1・2 / 南1・2 はそれぞれ地続きの 1 棟で、中の仕切りがホール。
  */
 export const FLOOR: FloorRow[] = [
@@ -203,7 +263,32 @@ export const FLOOR: FloorRow[] = [
         ],
     },
     { buildings: [{ id: '南', area: '南', halls: [south1, south2] }] },
+    {
+        buildings: [
+            { id: '企業西', area: '西', halls: [], companies: [west3, west4] },
+            { id: '企業南', area: '南', halls: [], companies: [south3, south4] },
+        ],
+    },
 ];
+
+/** 企業ブースの番号 → どのホールか。番号が構成表に無ければ null */
+export function companyHallOf(num: number): { area: Area; hall: string } | null {
+    for (const row of FLOOR) {
+        for (const b of row.buildings) {
+            for (const h of b.companies ?? []) {
+                if (h.groups.some((g) => g.booths.includes(num))) return { area: b.area, hall: h.hall };
+            }
+        }
+    }
+    return null;
+}
+
+/** 企業ブースの番号すべて。本文の数字を配置と取り違えないための照合に使う */
+export function companyBooths(): number[] {
+    return FLOOR.flatMap((row) =>
+        row.buildings.flatMap((b) => (b.companies ?? []).flatMap((h) => h.groups.flatMap((g) => g.booths))),
+    );
+}
 
 /** 地図の絞り込みチップに出す棟の並び */
 export function buildingIds(): string[] {

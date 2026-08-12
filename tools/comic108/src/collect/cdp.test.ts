@@ -18,6 +18,7 @@ import { join } from 'node:path';
 
 import type { RawCapture } from '../types';
 import { attachCapture, autoScroll, clampToToday, defaultRange, halveWindow, matchOperation, splitRange, windowDays, windowQuery } from './cdp';
+import { companyBooths, companyHallOf } from '../render/venue';
 import { connectCdp, openPage } from './cdp-client';
 
 const CHROME_CANDIDATES = [
@@ -99,6 +100,22 @@ if (!chromePath) {
     check('既定の範囲は未来まで伸びない', range.to <= tomorrow, { range, tomorrow });
     check('明日までに切り詰める', clampToToday('2099-01-01') === tomorrow, clampToToday('2099-01-01'));
     check('過去の指定はそのまま', clampToToday('2020-01-01') === '2020-01-01');
+}
+
+// --- 企業ブースの構成表 ---
+// 企業ブースパンフレット(2026 SUMMER)の地図から起こした。社数が合っていれば拾い漏らしは無い
+{
+    const all = companyBooths();
+    check('企業ブースは 122 社', all.length === 122, all.length);
+    check('番号の重複が無い', new Set(all).size === all.length);
+    check('1xxx は西 / 2xxx は南',
+        all.every((n) => (String(n).length === 4 ? companyHallOf(n)?.area === (String(n)[0] === '1' ? '西' : '南') : true)));
+    check('ガールズエリアは南3', [111, 112, 121, 122, 911, 912, 913, 914]
+        .every((n) => companyHallOf(n)?.area === '南' && companyHallOf(n)?.hall === '3'));
+    check('14xx は西4', companyHallOf(1411)?.hall === '4' && companyHallOf(1451)?.hall === '4');
+    check('19xx は西3', companyHallOf(1911)?.hall === '3' && companyHallOf(1943)?.hall === '3');
+    check('24xx〜26xx は南4', [2411, 2511, 2641].every((n) => companyHallOf(n)?.hall === '4'));
+    check('構成表に無い番号は null', companyHallOf(9999) === null && companyHallOf(2026) === null);
 }
 
 console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);
@@ -307,6 +324,22 @@ try {
     check('既定の範囲は未来まで伸びない', range.to <= tomorrow, { range, tomorrow });
     check('明日までに切り詰める', clampToToday('2099-01-01') === tomorrow, clampToToday('2099-01-01'));
     check('過去の指定はそのまま', clampToToday('2020-01-01') === '2020-01-01');
+}
+
+// --- 企業ブースの構成表 ---
+// 企業ブースパンフレット(2026 SUMMER)の地図から起こした。社数が合っていれば拾い漏らしは無い
+{
+    const all = companyBooths();
+    check('企業ブースは 122 社', all.length === 122, all.length);
+    check('番号の重複が無い', new Set(all).size === all.length);
+    check('1xxx は西 / 2xxx は南',
+        all.every((n) => (String(n).length === 4 ? companyHallOf(n)?.area === (String(n)[0] === '1' ? '西' : '南') : true)));
+    check('ガールズエリアは南3', [111, 112, 121, 122, 911, 912, 913, 914]
+        .every((n) => companyHallOf(n)?.area === '南' && companyHallOf(n)?.hall === '3'));
+    check('14xx は西4', companyHallOf(1411)?.hall === '4' && companyHallOf(1451)?.hall === '4');
+    check('19xx は西3', companyHallOf(1911)?.hall === '3' && companyHallOf(1943)?.hall === '3');
+    check('24xx〜26xx は南4', [2411, 2511, 2641].every((n) => companyHallOf(n)?.hall === '4'));
+    check('構成表に無い番号は null', companyHallOf(9999) === null && companyHallOf(2026) === null);
 }
 
 console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);

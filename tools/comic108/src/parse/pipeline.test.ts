@@ -180,6 +180,11 @@ check('棟の並びが会場どおり',
 check('西1・西2 が 1 棟になっている', /"id":"西","area":"西","halls":\[\{"hall":"1"[\s\S]*?\{"hall":"2"/.test(html));
 check('棟の外枠と中の仕切りがある', /\.bldg\s*\{[^}]*border:\s*2px/.test(html) && html.includes('.bhalls > .mhall + .mhall'));
 check('棟で絞り込むチップがある', html.includes('data-bldg="東123"') && html.includes('data-bldg="南"'));
+// 企業ブースは西・南の 4F。ブロック記号が無く番号だけなので別の作りで描く
+check('企業ブースの棟がある', html.includes('data-bldg="企業西"') && html.includes('data-bldg="企業南"'));
+check('企業ブースの番号が埋まっている', /"booths":\[111,112,121,122,911,912,913,914\]/.test(html));
+check('空きマスの class が既存の .empty と衝突していない',
+    html.includes('cb vacant') && !/class="cb empty"/.test(html));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));
 check('西は平仮名、南は英小字', /"西\/め":"1"/.test(html) && /"南\/t":"1"/.test(html));
 check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));

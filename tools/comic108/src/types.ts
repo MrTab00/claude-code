@@ -60,9 +60,14 @@ export interface Booth {
     area: Area | null;
     /** ホール号, 如 "4" / "1-2" */
     hall: string | null;
-    /** ブロック: 英字 A-Z 或片假名 ア-ン */
+    /** ブロック: 英字 A-Z 或片假名 ア-ン。企業ブースには無い */
     block: string | null;
     number: number | null;
+    /**
+     * 企業ブースは番号だけで場所が決まる(ブロック記号が無く、番号が 3〜4 桁)。
+     * 同人サークルの配置とは別物なので、地図でも一覧でも分けて扱う。
+     */
+    kind?: 'company';
     ab: AB | null;
     /** 命中的原始文本片段 */
     raw: string;

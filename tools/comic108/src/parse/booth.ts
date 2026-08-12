@@ -8,7 +8,15 @@
  * 原则: 解析不出就标 null, 不猜。低置信度的结果在 HTML 里会被标记出来, 由 overrides.json 人工补。
  */
 
+import { companyBooths, companyHallOf } from '../render/venue';
 import type { AB, Area, Booth, Confidence, Day } from '../types';
+
+/**
+ * 企業ブースの番号一覧。本文の数字を配置と取り違えないための照合に使う。
+ * 「2026年」「108」のような数字はいくらでも出てくるので、
+ * 構成表に載っている番号だけを企業ブースと認める。
+ */
+const COMPANY_BOOTHS = new Set(companyBooths());
 
 /** 片假名 ア-ヺ */
 const KATAKANA = '\\u30A1-\\u30FA';
@@ -127,7 +135,10 @@ function formatDisplay(b: Omit<Booth, 'display'>): string {
     let space = '';
     if (b.area) space += b.area;
     if (b.hall) space += b.hall;
-    if (b.block) {
+    if (b.kind === 'company') {
+        // 企業ブースはブロック記号が無いので、そのまま番号を続ける
+        space += ` ${b.number}`;
+    } else if (b.block) {
         // ホール番号がある時だけ区切る: 東A-12b / 東4 ア-12ab
         if (b.hall) space += ' ';
         space += b.block;
@@ -265,6 +276,46 @@ export function parseBooths(input: string): Booth[] {
                 block: canonicalBlock(block),
                 number: Number(num),
                 ab: toAB(ab),
+                raw: raw.trim(),
+                confidence: 'high',
+            },
+            { start: m.index, end: m.index + raw.length },
+        );
+    }
+
+    /*
+     * F: 企業ブース。「企業ブース西4-1933」「南3ホール・2213」「西3ホール No.1222」。
+     *
+     * ブロック記号が無く番号だけなので、そのまま拾うと年号や値段まで配置になってしまう。
+     * 企業ブースパンフレットに載っている番号と一致したものだけを認める。
+     * 地区の手がかりが無い場合は「企業」の語を必須にする。
+     */
+    const reF = new RegExp(
+        `(?:(企業(?:ブース)?)\\s*)?([西南])\\s*[34]?\\s*(?:ホール|地区)?\\s*(?:No\\.?)?\\s*[-・:：]?\\s*([0-9]{3,4})` +
+            `|(企業(?:ブース)?)\\s*(?:No\\.?)?\\s*[-・:：]?\\s*([0-9]{3,4})`,
+        'g',
+    );
+    for (const m of text.matchAll(reF)) {
+        if (m.index === undefined) continue;
+        const raw = m[0];
+        const num = Number(m[3] ?? m[5]);
+        if (!COMPANY_BOOTHS.has(num)) continue;
+        if (overlaps(spans, m.index, m.index + raw.length)) continue;
+        /*
+         * 地区とホールは番号から引く。ツイートの書き方は当てにしない ——
+         * 実データに「企業ブース西4-1933」があるが、1933 は構成表では西3 で、
+         * 番号のほうが正しい(ブロック記号でホールを決めるのと同じ考え方)。
+         */
+        const at = companyHallOf(num)!;
+        push(
+            {
+                day: pickDay(markers, m.index),
+                area: at.area,
+                hall: at.hall,
+                block: null,
+                number: num,
+                ab: null,
+                kind: 'company',
                 raw: raw.trim(),
                 confidence: 'high',
             },
