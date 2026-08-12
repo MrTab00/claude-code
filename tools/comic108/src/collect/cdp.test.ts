@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { RawCapture } from '../types';
-import { attachCapture, autoScroll, defaultRange, halveWindow, matchOperation, splitRange, windowDays, windowQuery } from './cdp';
+import { attachCapture, autoScroll, clampToToday, defaultRange, halveWindow, matchOperation, splitRange, windowDays, windowQuery } from './cdp';
 import { connectCdp, openPage } from './cdp-client';
 
 const CHROME_CANDIDATES = [
@@ -92,8 +92,13 @@ if (!chromePath) {
     check('割った窓を足すと元に戻る', halves[1].from === ws[1].from && halves[0].to === ws[1].to, halves);
     check('1 日まで来たらそれ以上割らない', halveWindow({ from: '2026-08-01', to: '2026-08-02' }).length === 0);
 
+    // 未来を検索しても必ず 0 件。イベント前に走らせると範囲の後ろが丸ごと空振りになる
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const range = defaultRange();
-    check('既定の範囲はイベントを含む', range.from < '2026-08-15' && range.to > '2026-08-16', range);
+    check('既定の範囲はイベント前から始まる', range.from < '2026-08-15', range);
+    check('既定の範囲は未来まで伸びない', range.to <= tomorrow, { range, tomorrow });
+    check('明日までに切り詰める', clampToToday('2099-01-01') === tomorrow, clampToToday('2099-01-01'));
+    check('過去の指定はそのまま', clampToToday('2020-01-01') === '2020-01-01');
 }
 
 console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);
@@ -295,8 +300,13 @@ try {
     check('割った窓を足すと元に戻る', halves[1].from === ws[1].from && halves[0].to === ws[1].to, halves);
     check('1 日まで来たらそれ以上割らない', halveWindow({ from: '2026-08-01', to: '2026-08-02' }).length === 0);
 
+    // 未来を検索しても必ず 0 件。イベント前に走らせると範囲の後ろが丸ごと空振りになる
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     const range = defaultRange();
-    check('既定の範囲はイベントを含む', range.from < '2026-08-15' && range.to > '2026-08-16', range);
+    check('既定の範囲はイベント前から始まる', range.from < '2026-08-15', range);
+    check('既定の範囲は未来まで伸びない', range.to <= tomorrow, { range, tomorrow });
+    check('明日までに切り詰める', clampToToday('2099-01-01') === tomorrow, clampToToday('2099-01-01'));
+    check('過去の指定はそのまま', clampToToday('2020-01-01') === '2020-01-01');
 }
 
 console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);

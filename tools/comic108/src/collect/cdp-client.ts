@@ -118,6 +118,8 @@ export interface CdpPage {
     url(): Promise<string>;
     /** 実ウィンドウとは無関係に描画上の視口サイズを決める。縦を大きく取ると走査が速い */
     setViewport(viewport: Viewport): Promise<void>;
+    /** 止められたタブを起こし直す */
+    wake(): Promise<void>;
     close(): Promise<void>;
 }
 
@@ -133,6 +135,16 @@ export async function openPage(conn: CdpConnection, viewport?: Viewport): Promis
     await conn.send('Network.enable', {}, sessionId);
     await conn.send('Runtime.enable', {}, sessionId);
 
+    /*
+     * 採集用のタブは前面に出ていない。Chrome は見えていないタブを止める:
+     * rAF も IntersectionObserver も動かなくなり、無限スクロールが「下端に来た」ことに
+     * 気付かなくなる —— スクロールは効いているのに次のページを取りに行かない状態になる。
+     * 長く待った後(レート制限の待機など)ほど顕著で、1 ページ採っただけで終わってしまう。
+     * 実際に見えているかに関わらず、描画側には「前面にいる」と伝えておく。
+     */
+    await conn.send('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
+    await conn.send('Page.setWebLifecycleState', { state: 'active' }, sessionId).catch(() => {});
+
     if (viewport) {
         await conn.send(
             'Emulation.setDeviceMetricsOverride',
@@ -144,6 +156,12 @@ export async function openPage(conn: CdpConnection, viewport?: Viewport): Promis
     return {
         targetId,
         sessionId,
+
+        /** 止められたタブを起こし直す。長く待った後に呼ぶ */
+        async wake() {
+            await conn.send('Page.setWebLifecycleState', { state: 'active' }, sessionId).catch(() => {});
+            await conn.send('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
+        },
 
         async setViewport(v: Viewport) {
             await conn.send('Emulation.setDeviceMetricsOverride', { ...v, deviceScaleFactor: 1, mobile: false }, sessionId);

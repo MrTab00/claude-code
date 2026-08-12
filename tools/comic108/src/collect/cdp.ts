@@ -202,7 +202,7 @@ export async function autoScroll(
     page: CdpPage,
     capture: Capture,
     options: ScrollOptions = {},
-): Promise<{ hitCap: boolean; rateLimited: boolean }> {
+): Promise<{ hitCap: boolean; rateLimited: boolean; scrolled: boolean }> {
     const { label = '', maxTweets = collectConfig.maxTweetsPerQuery, delay = randomDelay } = options;
 
     // scrollTop への代入は smooth 指定の影響を受けず必ず即時に効く
@@ -216,6 +216,7 @@ export async function autoScroll(
     let lastCount = 0;
     let lastY = -1;
     let hitsWhenIdleBegan = capture.rateLimitHits;
+    let scrolled = false;
 
     for (let round = 0; round < 2000; round++) {
         // 上限で止まったのか、本当に尽きたのかを呼び出し側に伝える。
@@ -231,7 +232,11 @@ export async function autoScroll(
          * タイムライン自体が返ってきていない = 採り終えていないので、引き直す必要がある。
          */
         if (idle >= collectConfig.idleRoundsBeforeStop) {
-            return { hitCap: false, rateLimited: capture.rateLimitHits > hitsWhenIdleBegan };
+            return {
+                hitCap: false,
+                rateLimited: capture.rateLimitHits > hitsWhenIdleBegan,
+                scrolled,
+            };
         }
 
         const m = await page.evaluate<{ y: number; h: number; total: number }>(step);
@@ -239,6 +244,7 @@ export async function autoScroll(
 
         const grew = capture.seenTweets.size > lastCount;
         const moved = m.y > lastY + 8;
+        if (moved) scrolled = true;
         const atBottom = m.y + m.h >= m.total - 400;
 
         if (grew) {
@@ -254,7 +260,7 @@ export async function autoScroll(
 
         lastY = m.y;
     }
-    return { hitCap: false, rateLimited: false };
+    return { hitCap: false, rateLimited: false, scrolled };
 }
 
 // --- 期間で区切って掘る ---
@@ -309,7 +315,16 @@ export function windowQuery(query: string, w: SearchWindow): string {
 export function defaultRange(): { from: string; to: string } {
     const first = utc(event.days[0].date);
     const last = utc(event.days[event.days.length - 1].date);
-    return { from: ymd(first - 45 * DAY_MS), to: ymd(last + 3 * DAY_MS) };
+    return { from: ymd(first - 45 * DAY_MS), to: clampToToday(ymd(last + 3 * DAY_MS)) };
+}
+
+/**
+ * 未来は検索しても必ず 0 件。イベント前に走らせると範囲の後ろが丸ごと空振りになるので、
+ * 明日までに切り詰める。イベント後に走らせれば自然に全期間が対象になる。
+ */
+export function clampToToday(to: string): string {
+    const tomorrow = ymd(Date.now() + DAY_MS);
+    return to > tomorrow ? tomorrow : to;
 }
 
 /** Enter が押されるまで待つ */
@@ -419,8 +434,9 @@ async function collectQuery(
 
     let hitCap = false;
     let rateLimited = false;
+    let scrolled = true;
     if (collectConfig.autoScroll) {
-        ({ hitCap, rateLimited } = await autoScroll(page, capture, { label: query, maxTweets }));
+        ({ hitCap, rateLimited, scrolled } = await autoScroll(page, capture, { label: query, maxTweets }));
     } else {
         console.log('\n    autoScroll = false: ブラウザで手動スクロールしてください。終わったら Enter。');
         await waitForEnter();
@@ -441,7 +457,8 @@ async function collectQuery(
     process.stdout.write(
         `\r    ${query} — ${capture.seenTweets.size} 件` +
             `(新規 ${newTweets} / 応答 ${capture.captures})${budget}` +
-            `${hitCap ? ' ⤵ 上限' : ''}${rateLimited ? ' ⏳ レート制限' : ''}${trouble}\n`,
+            `${hitCap ? ' ⤵ 上限' : ''}${rateLimited ? ' ⏳ レート制限' : ''}` +
+            `${scrolled ? '' : ' ⚠ ページが動きませんでした'}${trouble}\n`,
     );
 
     return {
@@ -481,9 +498,9 @@ const RATE_LIMIT_MAX_WAIT_MS = 20 * 60_000;
 const RATE_LIMIT_RETRIES = 3;
 
 /** 次にレート制限が回復するまでの待ち時間 */
-function waitForReset(r: CollectResult): number {
-    if (!r.rateLimit) return RATE_LIMIT_WAIT_MS;
-    const until = r.rateLimit.resetAt - Date.now() + 5_000; // 少し余裕を足す
+function waitForReset(rl: RateLimit | null): number {
+    if (!rl) return RATE_LIMIT_WAIT_MS;
+    const until = rl.resetAt - Date.now() + 5_000; // 少し余裕を足す
     return Math.min(RATE_LIMIT_MAX_WAIT_MS, Math.max(30_000, until));
 }
 
@@ -504,6 +521,8 @@ export async function collectAll(
     if (collectConfig.window.to) range.to = collectConfig.window.to;
     if (from) range.from = from;
     if (to) range.to = to;
+    // 未来は必ず 0 件。イベント前に走らせたときに後ろが空振りするのを防ぐ
+    range.to = clampToToday(range.to);
 
     const conn = await connect(autoLaunch);
     const page = await openPage(conn, collectConfig.viewport);
@@ -511,6 +530,8 @@ export async function collectAll(
     const results: CollectResult[] = [];
     // 走査全体で見たツイート。同じ投稿が別の窓・別のキーワードで何度も出てくる
     const seenRun = new Set<string>();
+    // 直近に見えたレート制限の残り。検索を始めてよいかの判断に使う
+    let budget: RateLimit | null = null;
 
     try {
         await ensureLoggedIn(page);
@@ -532,7 +553,27 @@ export async function collectAll(
             while (queue.length && done < collectConfig.window.maxWindowsPerQuery) {
                 const w = queue.shift() ?? null;
                 const q = w ? windowQuery(query, w) : query;
-                const r = await collectQuery(conn, page, q, runId, maxTweets, seenRun);
+
+                /*
+                 * 残り回数が足りないまま始めると、途中でレート制限に当たって最初から引き直しになる。
+                 * 同じ期間に 2 回ぶんの回数を使うことになるので、先に回復を待ってから始める。
+                 */
+                if (budget && budget.remaining < collectConfig.minBudgetToStart) {
+                    const wait = waitForReset(budget);
+                    console.log(
+                        `    残り ${budget.remaining} 回では足りないので、` +
+                            `回復まで ${Math.round(wait / 60_000)} 分待ちます`,
+                    );
+                    await sleep(wait);
+                    // 長く待つとタブが止められる。無限スクロールが効かなくなるので起こしておく
+                    await page.wake();
+                    budget = null;
+                }
+
+                // これ以上割れない窓は、もう割って掘り直せない。そのぶん深く採る
+                const cap = w && windowDays(w) <= 1 ? collectConfig.maxTweetsWhenUnsplittable : maxTweets;
+                const r = await collectQuery(conn, page, q, runId, cap, seenRun);
+                if (r.rateLimit) budget = r.rateLimit;
                 results.push(r);
                 done++;
 
@@ -554,12 +595,14 @@ export async function collectAll(
                     const key = w ? `${w.from}/${w.to}` : query;
                     const tried = (retries.get(key) ?? 0) + 1;
                     retries.set(key, tried);
-                    const wait = waitForReset(r);
+                    const wait = waitForReset(r.rateLimit);
                     console.log(
                         `    レート制限。${Math.round(wait / 60_000)} 分ほど待ちます` +
                             (tried <= RATE_LIMIT_RETRIES ? `(この期間を引き直します ${tried}/${RATE_LIMIT_RETRIES})` : ''),
                     );
                     await sleep(wait);
+                    await page.wake();
+                    budget = null;
                     if (tried <= RATE_LIMIT_RETRIES) {
                         queue.unshift(w);
                         done--; // 引き直しは進捗に数えない
