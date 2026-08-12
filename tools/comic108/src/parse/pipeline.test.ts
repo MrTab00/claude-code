@@ -141,6 +141,15 @@ check('overrides で名前を上書きできる',
     patched.circles.some((c) => c.circleName === '手動で直した名前'),
     patched.circles.map((c) => c.circleName));
 
+// --- 検索キーワード ---
+// ハッシュタグ記号を付けるとハッシュタグを使った投稿しか当たらない。記号なしなら
+// 本文に書いただけの投稿も拾う。おまけに # はシェルでコメント開始になって引数が消える
+{
+    const { collect } = await import('../../config');
+    check('キーワードに # を付けていない', !collect.queries.some((q) => q.includes('#')), collect.queries);
+    check('キーワードは 2 文字以上', collect.queries.every((q) => q.trim().length >= 2), collect.queries);
+}
+
 // --- レンダリング ---
 const html = renderHtml(dataset);
 check('HTML が生成される', html.startsWith('<!doctype html>') && html.length > 5000);

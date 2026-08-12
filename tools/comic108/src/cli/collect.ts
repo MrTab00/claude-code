@@ -16,8 +16,30 @@ import { PROFILE_DIR } from '../collect/launch';
 
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const queries = args.length > 0 ? args : collectConfig.queries;
+const queries = (args.length > 0 ? args : collectConfig.queries).map((q) => q.trim()).filter(Boolean);
 const autoLaunch = !flags.includes('--no-launch');
+
+/*
+ * 壊れたキーワードで走り出さない。
+ *
+ * シェルは # をコメント開始として扱うことがあり、`bun run collect "#C108 お品書き"` の
+ * 引用が外れると「#」だけが残る。そのまま走ると 1 時間かけて 0 件を採ってくる。
+ * 記号だけ・1 文字だけのキーワードはここで止めて、何が起きたかを書く。
+ */
+const junk = queries.filter((q) => q.replace(/[#＃"'“”\s]/g, '').length < 2);
+if (junk.length) {
+    console.error(`
+検索できないキーワードが混じっています: ${junk.map((q) => JSON.stringify(q)).join(', ')}
+
+シェルが引用符を外して # 以降を落とした可能性が高いです。
+キーワードに # は要りません —— X は本文の語もハッシュタグも同じ語として索引するので、
+「C108 お品書き」で「#C108」の投稿も本文に書いただけの投稿も両方拾えます(こちらの方が広い)。
+
+  bun run collect                    config.ts の全キーワード(これが一番確実)
+  bun run collect 'C108 お品書き'     1 つだけ指定する場合
+`);
+    process.exit(1);
+}
 
 const useWindows = !flags.includes('--no-window') && collectConfig.window.enabled;
 const from = flags.find((f) => f.startsWith('--from='))?.split('=')[1];
@@ -43,6 +65,7 @@ console.log(`
   接続先     ${collectConfig.cdpEndpoint}${autoLaunch ? ' (必要なら Chrome を自動起動)' : ''}
   プロファイル ${PROFILE_DIR}
   キーワード  ${queries.length} 件
+${queries.map((q) => `    ・ ${q}`).join('\n')}
   期間       ${
       useWindows
           ? `${range.from} 〜 ${range.to} を ${windows} 期間に分けて / 全 ${queries.length * windows} 回から開始`

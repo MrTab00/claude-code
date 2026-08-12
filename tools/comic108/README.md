@@ -71,7 +71,7 @@ bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chro
 |------|------|
 | `bun run doctor` | 环境自检：Chrome、调试端口、X 登录状态 |
 | `bun run collect` | CDP 采集，落 `data/raw/*.jsonl`（需要时自动启动 Chrome） |
-| `bun run collect "#C108 お品書き"` | 只跑指定关键词 |
+| `bun run collect 'C108 お品書き'` | 只跑指定关键词（**别加 `#`**，见下） |
 | `bun run collect --no-window` | 不按期间切分（快，但会漏） |
 | `bun run collect --from=2026-07-01 --to=2026-08-18` | 只找这段期间 |
 | `bun run collect --max=30` | 限制单次搜索的采集量，用来小样试跑 |
@@ -85,6 +85,24 @@ bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chro
 | `bun run test` | 全部自测（不需要联网和账号） |
 
 原始响应落盘后，解析可以离线重跑任意次。**调正则不需要重新采集。**
+
+---
+
+## 关键词不要加 `#`
+
+X 把正文里的词和 hashtag 索引成同一个词，所以搜 `C108 お品書き` **同时命中**
+`#C108 #お品書き` 的推文和只在正文里写了这些字的推文。写成 `#C108` 反而只能命中用了
+hashtag 的那部分，一开始就漏掉一批。
+
+而且 `#` 在 shell 里是注释开头。`bun run collect "#C108 お品書き"` 一旦引号被吃掉，
+剩下的就只有 `#`，然后花一小时采回 0 条。现在遇到这种只剩符号的关键词会直接报错退出，
+并且开跑前会把实际要搜的关键词逐条打印出来，肉眼就能发现被截断。
+
+最稳的用法是**不带参数**，直接用 `config.ts` 里的那一组：
+
+```bash
+bun run collect
+```
 
 ---
 
