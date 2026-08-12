@@ -178,14 +178,25 @@ body {
   display: flex; flex-direction: column; gap: 34px;
 }
 
-.marea { display: flex; flex-direction: column; gap: 10px; }
-.marea > h3 { margin: 0; font: 600 13px var(--sans); color: var(--muted); }
+/*
+ * 会場の外枠と、その中のホールの枠。
+ * 島だけを浮かべると「どこからどこまでが 1 つの建物か」が読めないので、
+ * 配置図と同じように地区を太い外枠で囲み、中のホールを細い枠で仕切る。
+ */
+.marea {
+  display: flex; flex-direction: column; gap: 12px;
+  border: 3px solid var(--ink); border-radius: 6px; padding: 12px 14px 16px; background: var(--surface);
+}
+.marea > h3 { margin: 0; font: 700 13px var(--sans); color: var(--muted); letter-spacing: .04em; }
+.marea[data-area="東"] { border-color: var(--east); }
+.marea[data-area="西"] { border-color: var(--west); }
+.marea[data-area="南"] { border-color: var(--south); }
 /* ホール列。ホール同士は大きく空ける —— 会場でも間が空いている */
 .mhallrow { display: flex; gap: 46px; align-items: flex-start; }
 .mhallrows { display: flex; flex-direction: column; gap: 30px; }
 .mhall {
   display: flex; flex-direction: column; gap: 6px;
-  border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px 10px; background: var(--surface-2);
+  border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 10px 10px; background: var(--surface-2);
 }
 .mhall > .name { font: 700 12px var(--mono); color: var(--muted); }
 .mhall[data-area="東"] > .name { color: var(--east); }
@@ -196,6 +207,8 @@ body {
 .hsections { display: flex; flex-direction: column; gap: 22px; }
 /* 段の中のまとまり同士は通路ぶん空ける */
 .hsection { display: flex; gap: 20px; align-items: flex-start; }
+/* 上下 2 段のホールで、短いほうの段が付く側 */
+.hsection[data-align="right"] { justify-content: flex-end; }
 .hgroup { display: flex; gap: 5px; align-items: flex-start; }
 
 /* 島は通路で横に切られている。その隙間がこの gap */
@@ -789,7 +802,9 @@ function islandHtml(area, hallNo, island, slots, letterAfter, spaces, isWall) {
 function hallHtml(area, hall, spaces) {
   const sections = hall.sections.map(sec => {
     const slots = sectionSlots(sec);
-    return '<div class="hsection">' + sec.groups.map(group =>
+    // 短いほうの段をどちら側に寄せるか。西2 は下段が右端(さこけくき の下)に付く
+    return '<div class="hsection"' + (sec.align === 'right' ? ' data-align="right"' : '') + '>' +
+      sec.groups.map(group =>
       '<div class="hgroup">' + group.map(isl =>
         islandHtml(area, hall.hall, isl, slots, sec.letterAfter, spaces, false)
       ).join('') + '</div>'
@@ -820,7 +835,8 @@ function renderMap(rows) {
     const body = hallRows.map(hr =>
       '<div class="mhallrow">' + hr.map(h => hallHtml(area, h, spaces)).join('') + '</div>'
     ).join('');
-    html += '<div class="marea"><h3>' + esc(area) + '地区</h3><div class="mhallrows">' + body + '</div></div>';
+    html += '<div class="marea" data-area="' + esc(area) + '"><h3>' + esc(area) + '地区</h3>' +
+            '<div class="mhallrows">' + body + '</div></div>';
   }
 
   if (strays.size) {

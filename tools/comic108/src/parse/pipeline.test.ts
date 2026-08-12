@@ -159,6 +159,10 @@ check('会場のホール構成が入っている', /"hall":"7"/.test(html) && /
 // 島の段数はブロックごとに違う。均等に並べると会場と違う形になる
 check('端の島が短くなっている', /"block":"ヨ","bands":\[7,6,6,8\]/.test(html) && /"block":"ユ","bands":\[8,8,8,9\]/.test(html));
 check('セ は東2、ス は東1', /"東\/セ":"2"/.test(html) && /"東\/ス":"1"/.test(html));
+// 西2 の下段は上段の右端(さこけくき)の真下に付く。西1 の左右反転
+check('西2 の下段は右寄せ', /"letterAfter":2,"align":"right"/.test(html));
+// 会場の外枠とホールの枠。どこからどこまでが 1 つの建物か分かるようにする
+check('地区の外枠がある', html.includes('class="marea" data-area=') && /\.marea\s*\{[^}]*border:\s*3px/.test(html));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));
 check('西は平仮名、南は英小字', /"西\/め":"1"/.test(html) && /"南\/t":"1"/.test(html));
 check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));

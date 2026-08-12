@@ -27,6 +27,11 @@ export interface Island {
 export interface Section {
     /** ブロック記号を何段目の後ろに置くか(0 始まり) */
     letterAfter: number;
+    /**
+     * 段が上下に分かれるホールで、短いほうの段をどちら側に寄せるか。既定は左。
+     * 西2 は下段 かおえうい が上段の さこけくき の真下に来る(西1 の左右反転)。
+     */
+    align?: 'left' | 'right';
     groups: Island[][];
 }
 
@@ -114,8 +119,9 @@ export const VENUE: AreaLayout[] = [
                             ],
                         },
                     ],
-                    // ア は東1〜3 の外周をぐるりと回る。ここでは東1 の右端にまとめて置く
-                    wall: { block: 'ア', spaces: 96, side: 'right' },
+                    // 壁サークルは会場の外周をぐるりと回る(ア は東1〜3 の三方を囲む)。
+                    // 折り返しまでは描けないので、そのホールの端に 1 本にまとめて置く
+                    wall: { block: 'ア', spaces: 95, side: 'right' },
                 },
             ],
             [
@@ -132,7 +138,7 @@ export const VENUE: AreaLayout[] = [
                             groups: [isles('WVUT', E7), isles('SRQ', E7S), isles('PON', E7P)],
                         },
                     ],
-                    wall: { block: 'A', spaces: 96, side: 'left' },
+                    wall: { block: 'A', spaces: 48, side: 'left' },
                 },
             ],
         ],
@@ -153,7 +159,7 @@ export const VENUE: AreaLayout[] = [
                         },
                         { letterAfter: 2, groups: [isles('むみまほへ', W52L)] },
                     ],
-                    wall: { block: 'め', spaces: 104, side: 'left' },
+                    wall: { block: 'め', spaces: 73, side: 'left' },
                 },
                 {
                     hall: '2',
@@ -165,9 +171,9 @@ export const VENUE: AreaLayout[] = [
                                 [...isles('そせ', W28), ...isles('すし', W26), ...isles('さこけくき', W52)],
                             ],
                         },
-                        { letterAfter: 2, groups: [isles('かおえうい', W52L)] },
+                        { letterAfter: 2, align: 'right', groups: [isles('かおえうい', W52L)] },
                     ],
-                    wall: { block: 'あ', spaces: 104, side: 'right' },
+                    wall: { block: 'あ', spaces: 73, side: 'right' },
                 },
             ],
         ],
