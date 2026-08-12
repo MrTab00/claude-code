@@ -198,6 +198,15 @@ body {
   display: flex; flex-direction: column; gap: 6px;
   border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 10px 10px; background: var(--surface-2);
 }
+/*
+ * 地続きの棟。西1・西2 は別々の建物ではなく、1 つの建物を仕切ってあるだけ。
+ * 枠をひとつにして、中の仕切りは破線で見せる。
+ */
+.mhallrow.joined {
+  gap: 0; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface-2);
+}
+.mhallrow.joined > .mhall { border: 0; border-radius: 0; background: none; }
+.mhallrow.joined > .mhall + .mhall { border-left: 1.5px dashed var(--border); }
 .mhall > .name { font: 700 12px var(--mono); color: var(--muted); }
 .mhall[data-area="東"] > .name { color: var(--east); }
 .mhall[data-area="西"] > .name { color: var(--west); }
@@ -832,8 +841,10 @@ function renderMap(rows) {
   let html = '';
 
   for (const { area, rows: hallRows } of VENUE) {
+    // joined の列は 1 棟。西1・西2 は間仕切りがあるだけの地続きなので枠をひとつにする
     const body = hallRows.map(hr =>
-      '<div class="mhallrow">' + hr.map(h => hallHtml(area, h, spaces)).join('') + '</div>'
+      '<div class="mhallrow' + (hr.joined ? ' joined' : '') + '">' +
+      hr.halls.map(h => hallHtml(area, h, spaces)).join('') + '</div>'
     ).join('');
     html += '<div class="marea" data-area="' + esc(area) + '"><h3>' + esc(area) + '地区</h3>' +
             '<div class="mhallrows">' + body + '</div></div>';

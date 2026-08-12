@@ -49,10 +49,21 @@ export interface Hall {
     wall?: Wall;
 }
 
+/** ホールの横並び 1 列ぶん */
+export interface HallRow {
+    /** 左→右の並び */
+    halls: Hall[];
+    /**
+     * 1 棟として 1 つの枠で囲むかどうか。
+     * 西1 と西2 は間仕切りがあるだけの地続きの建物なので、まとめて 1 枠にする。
+     */
+    joined?: boolean;
+}
+
 export interface AreaLayout {
     area: Area;
-    /** ホールの並び。段が分かれている地区があるので二次元 */
-    rows: Hall[][];
+    /** ホールの並び。段が分かれている地区があるので列ごとに持つ */
+    rows: HallRow[];
 }
 
 /** 同じ形の島がいくつも続くので、まとめて作る */
@@ -82,7 +93,7 @@ export const VENUE: AreaLayout[] = [
     {
         area: '東',
         rows: [
-            [
+            { halls: [
                 {
                     hall: '3',
                     sections: [
@@ -123,8 +134,8 @@ export const VENUE: AreaLayout[] = [
                     // 折り返しまでは描けないので、そのホールの端に 1 本にまとめて置く
                     wall: { block: 'ア', spaces: 95, side: 'right' },
                 },
-            ],
-            [
+            ] },
+            { halls: [
                 {
                     hall: '7',
                     sections: [
@@ -140,13 +151,13 @@ export const VENUE: AreaLayout[] = [
                     ],
                     wall: { block: 'A', spaces: 48, side: 'left' },
                 },
-            ],
+            ] },
         ],
     },
     {
         area: '西',
         rows: [
-            [
+            { halls: [
                 {
                     hall: '1',
                     sections: [
@@ -175,13 +186,13 @@ export const VENUE: AreaLayout[] = [
                     ],
                     wall: { block: 'あ', spaces: 73, side: 'right' },
                 },
-            ],
+            ], joined: true },
         ],
     },
     {
         area: '南',
         rows: [
-            [
+            { halls: [
                 {
                     hall: '1',
                     sections: [
@@ -206,7 +217,7 @@ export const VENUE: AreaLayout[] = [
                     ],
                     wall: { block: 'a', spaces: 54, side: 'right' },
                 },
-            ],
+            ] },
         ],
     },
 ];
@@ -247,7 +258,7 @@ export function hallBlocks(hall: Hall): string[] {
 
 /** 地区とホールを平らに辿る */
 export function eachHall(): { area: Area; hall: Hall }[] {
-    return VENUE.flatMap(({ area, rows }) => rows.flat().map((hall) => ({ area, hall })));
+    return VENUE.flatMap(({ area, rows }) => rows.flatMap((row) => row.halls.map((hall) => ({ area, hall }))));
 }
 
 /**

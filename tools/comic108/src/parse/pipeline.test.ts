@@ -162,6 +162,9 @@ check('セ は東2、ス は東1', /"東\/セ":"2"/.test(html) && /"東\/ス":"1
 // 西2 の下段は上段の右端(さこけくき)の真下に付く。西1 の左右反転
 check('西2 の下段は右寄せ', /"letterAfter":2,"align":"right"/.test(html));
 // 会場の外枠とホールの枠。どこからどこまでが 1 つの建物か分かるようにする
+// 西1・西2 は地続きなので 1 つの枠にまとめる
+check('西1・西2 が 1 棟になっている',
+    /"joined":true/.test(html) && /\.mhallrow\.joined\s*\{/.test(html));
 check('地区の外枠がある', html.includes('class="marea" data-area=') && /\.marea\s*\{[^}]*border:\s*3px/.test(html));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));
 check('西は平仮名、南は英小字', /"西\/め":"1"/.test(html) && /"南\/t":"1"/.test(html));
