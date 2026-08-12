@@ -139,6 +139,53 @@ const cases: Case[] = [
         expect: null,
         count: 0,
     },
+    // --- 実データで取りこぼした形。すべて 2026-08-12 の走査ログから ---
+    {
+        name: '隅付き括弧のブロック + 番号と ab の間の区切り 東【シ】11ｰb',
+        input: 'perique@C108二日目東【シ】11ｰb',
+        expect: { day: 2, area: '東', block: 'シ', number: 11, ab: 'b', confidence: 'high' },
+    },
+    {
+        name: '括弧の中に全部入る形 【B28-b】',
+        input: '銀鏡にと@C108土曜日【B28-b】',
+        expect: { day: 1, block: 'B', number: 28, ab: 'b', confidence: 'high' },
+    },
+    {
+        name: '地区+ホール+括弧ブロック 南2【b】13ab',
+        input: 'ヒカベベ@C108 夏コミ日曜日 南2【b】13ab',
+        expect: { day: 2, area: '南', hall: '2', block: 'b', number: 13, ab: 'ab', confidence: 'high' },
+    },
+    {
+        name: '括弧の内側に空白 南2ホール【 h 38b】',
+        input: '日曜日 Cosplay島 南2ホール【 h 38b】 えびとぴあ',
+        expect: { day: 2, area: '南', hall: '2', block: 'h', number: 38, ab: 'b', confidence: 'high' },
+    },
+    {
+        name: '片假名ブロックは空白区切りでも拾う キ 46a',
+        input: 'アンブロシア@C108 1日目 キ 46a',
+        expect: { day: 1, block: 'キ', number: 46, ab: 'a', confidence: 'high' },
+    },
+    {
+        name: '区切りの前後に空白 南1 ホール / I - 18a',
+        input: '8/16(日) 南1 ホール / I - 18a おさけカンパニー',
+        expect: { day: 2, area: '南', hall: '1', block: 'I', number: 18, ab: 'a', confidence: 'high' },
+    },
+    {
+        name: 'U+2212 のマイナスを区切りに使う 西２ホール あ−12a',
+        input: 'コミックマーケット108 西２ホール あ−12a D-trick で参加します',
+        expect: { area: '西', hall: '2', block: 'あ', number: 12, ab: 'a', confidence: 'high' },
+    },
+    {
+        // 「土」1 文字は日程と見なさない(土産・郷土などがある)。配置は取れて日程だけ空、が正しい
+        name: '片假名と字形が同じ漢字 東2二40a(二 は ニ)',
+        input: '若月くまくま🧸C108土東2二40a🍋',
+        expect: { day: null, area: '東', hall: '2', block: 'ニ', number: 40, ab: 'a', confidence: 'high' },
+    },
+    {
+        name: '番号と ab の間に区切りがあっても助詞は拾わない',
+        input: '新刊は 12 b 500円です',
+        expect: null,
+    },
 ];
 
 let passed = 0;

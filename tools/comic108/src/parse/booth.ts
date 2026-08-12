@@ -14,13 +14,41 @@ import type { AB, Area, Booth, Confidence, Day } from '../types';
 const KATAKANA = '\\u30A1-\\u30FA';
 /** 平假名 ぁ-ゖ */
 const HIRAGANA = '\\u3041-\\u3096';
-/** ブロック 记号: 英字 / 片假名 / 平假名, 单字符 */
-const BLOCK = `[A-Za-z${KATAKANA}${HIRAGANA}]`;
-/** ブロック 与番号之间的分隔符, 可省略 */
-const SEP = '[\\-ー－‐‑–—ｰ_・]?\\s*';
-/** 包住 ブロック 的各种引号 */
-const QUOTE_L = '[「『"“”\'\'｢]?';
-const QUOTE_R = '[」』"“”\'\'｣]?';
+/**
+ * 片假名ブロックと見た目が同じ漢字。実データで「東2二40a」のように書かれる。
+ * ニ と 二、ハ と 八 は字形がほぼ同じで、変換や手打ちで入れ替わる。
+ */
+const LOOKALIKE: Record<string, string> = { 二: 'ニ', 八: 'ハ', 力: 'カ', 夕: 'タ', 卜: 'ト', 乂: 'メ' };
+const LOOKALIKE_CHARS = Object.keys(LOOKALIKE).join('');
+
+/** ブロック 记号: 英字 / 片假名 / 平假名 / 見た目が同じ漢字, 单字符 */
+const BLOCK = `[A-Za-z${KATAKANA}${HIRAGANA}${LOOKALIKE_CHARS}]`;
+/** ブロック 与番号之间的分隔符, 可省略。区切りがあるなら前後の空白は許す */
+const SEP = '\\s*[\\-ー－‐‑–—ｰ_・]?\\s*';
+/**
+ * 番号と ab の間の区切り。「11-b」「28-b」のように挟む書き方が実データにある。
+ * ab は a / b / ab のいずれかに限られるので、区切りを許しても取り違えは起きない。
+ */
+const AB = `${SEP}(ab|AB|a|b|A|B)`;
+/**
+ * 包住 ブロック 的各种引号。
+ * 実データでは 【シ】11-b / 南2【b】13ab のように隅付き括弧が最も多い。
+ * 括弧の内側に空白が入る例(【 h 38b】)もあるので、括弧のすぐ内側の空白も許す。
+ */
+const QUOTE_L = '[「『【〔《"“”\'\'｢]?\\s*';
+const QUOTE_R = '\\s*[」』】〕》"“”\'\'｣]?';
+/**
+ * 空白を許さない版。地区の手がかりが無い場所で使う。
+ * 平仮名ブロック(あ〜ん)には助詞がそのまま含まれるので、空白区切りを許すと
+ * 「新刊は 12b 500円です」の「は」をブロックとして拾ってしまう。
+ */
+const TIGHT_L = '[「『【〔《"“”\'\'｢]?';
+const TIGHT_R = '[」』】〕》"“”\'\'｣]?';
+
+/** 見た目が同じ漢字で書かれたブロックを片假名に直す */
+export function canonicalBlock(block: string): string {
+    return LOOKALIKE[block] ?? block;
+}
 
 const AREAS: Area[] = ['東', '西', '南'];
 
@@ -37,7 +65,8 @@ export function normalize(text: string): string {
             // コピペで紛れ込むもので、見た目には出ないのに解析だけ壊すので最初に落とす
             .replace(/[­​-‍⁠﻿]/g, '')
             .normalize('NFKC')
-            .replace(/[‐‑–—]/g, '-')
+            // U+2212(数学のマイナス)は NFKC でも変換されない。「あ−12a」のように区切りに使われる
+            .replace(/[‐‑–—−]/g, '-')
             .replace(/[　\t]+/g, ' ')
     );
 }
@@ -144,7 +173,7 @@ export function parseBooths(input: string): Booth[] {
             `([0-9]{1,2}(?:\\s*[-~～]\\s*[0-9]{1,2})?)?\\s*` +
             `(?:ホール|地区)?\\s*` +
             `${QUOTE_L}(${BLOCK})${QUOTE_R}\\s*(?:ブロック)?\\s*` +
-            `${SEP}([0-9]{1,2})\\s*(ab|AB|a|b|A|B)?`,
+            `${SEP}([0-9]{1,2})(?:${AB})?`,
         'g',
     );
     for (const m of text.matchAll(reA)) {
@@ -155,7 +184,7 @@ export function parseBooths(input: string): Booth[] {
                 day: pickDay(markers, m.index),
                 area: area as Area,
                 hall: hall ? hall.replace(/\s/g, '') : null,
-                block,
+                block: canonicalBlock(block),
                 number: Number(num),
                 ab: toAB(ab),
                 raw: raw.trim(),
@@ -171,7 +200,7 @@ export function parseBooths(input: string): Booth[] {
     // そのまま含まれるので、空白だけで区切られた形を許すと「新刊は 12b 500円です」の
     // 「は」をブロックとして拾ってしまう。区切り記号があるか、数字と地続きの場合だけ認める。
     const reB = new RegExp(
-        `${QUOTE_L}(${BLOCK})${QUOTE_R}(?:\\s*ブロック\\s*)?(?:[-ー－‐‑–—_・]\\s*)?([0-9]{1,2})\\s*(ab|AB|a|b|A|B)\\b`,
+        `${TIGHT_L}(${BLOCK})${TIGHT_R}(?:\\s*ブロック\\s*)?(?:\\s*[-ー－‐‑–—_・]\\s*)?([0-9]{1,2})${AB}\\b`,
         'g',
     );
     for (const m of text.matchAll(reB)) {
@@ -183,7 +212,30 @@ export function parseBooths(input: string): Booth[] {
                 day: pickDay(markers, m.index),
                 area: null,
                 hall: null,
-                block,
+                block: canonicalBlock(block),
+                number: Number(num),
+                ab: toAB(ab),
+                raw: raw.trim(),
+                confidence: 'high',
+            },
+            { start: m.index, end: m.index + raw.length },
+        );
+    }
+
+    // B2: 片假名ブロックに限り、空白だけの区切りも認める 「1日目 キ 46a」。
+    // 助詞は平仮名なので、片假名なら空白区切りでも取り違えない。
+    // 直前が片假名のときは弾く —— 「アンブロシア 46a」の末尾を拾わないため
+    const reB2 = new RegExp(`(?<![${KATAKANA}ー])([${KATAKANA}])\\s+([0-9]{1,2})${AB}\\b`, 'g');
+    for (const m of text.matchAll(reB2)) {
+        if (m.index === undefined) continue;
+        if (overlaps(spans, m.index, m.index + m[0].length)) continue;
+        const [raw, block, num, ab] = m;
+        push(
+            {
+                day: pickDay(markers, m.index),
+                area: null,
+                hall: null,
+                block: canonicalBlock(block),
                 number: Number(num),
                 ab: toAB(ab),
                 raw: raw.trim(),
@@ -197,7 +249,7 @@ export function parseBooths(input: string): Booth[] {
     // 語尾の「ブロック」を必須にして誤検出を抑える
     const reE = new RegExp(
         `(?:([東西南])\\s*([0-9]{1,2})?\\s*(?:ホール|地区)?\\s*)?` +
-            `([0-9]{1,2})\\s*(ab|AB|a|b|A|B)\\s*` +
+            `([0-9]{1,2})${AB}\\s*` +
             `${QUOTE_L}(${BLOCK})${QUOTE_R}\\s*ブロック`,
         'g',
     );
@@ -210,7 +262,7 @@ export function parseBooths(input: string): Booth[] {
                 day: pickDay(markers, m.index),
                 area: (area as Area) ?? null,
                 hall: hall ?? null,
-                block,
+                block: canonicalBlock(block),
                 number: Number(num),
                 ab: toAB(ab),
                 raw: raw.trim(),
