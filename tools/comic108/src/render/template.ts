@@ -144,42 +144,66 @@ body {
 .chip[data-value="南"][aria-pressed="true"] { background: var(--south-soft); border-color: var(--south); color: var(--south); }
 .count { margin-left: auto; font: 500 12.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 
-/* --- 地図: 公式のホール構成に沿った島レイアウト --- */
-.mapwrap {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column;
-}
+/* --- 地図: 会場の形なりに並べる --- */
+.mapwrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .mapbar {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  padding: 9px 12px; border-bottom: 1px solid var(--border);
+  padding: 8px 0 10px;
 }
-.mapbar .note { font-size: 11.5px; color: var(--muted); }
+.mapbar .note { font-size: 11.5px; color: var(--muted); flex: 1 1 240px; min-width: 0; }
 .mapbar .note a { color: var(--accent); }
-.mapbar .zoom { margin-left: auto; display: flex; gap: 4px; align-items: center; }
-.mapbar .zoom span { font: 500 12px var(--mono); color: var(--muted); min-width: 46px; text-align: right; }
+.mapbar .zoom { display: flex; gap: 6px; align-items: center; }
+.mapbar .zoom span { font: 500 12px var(--mono); color: var(--muted); min-width: 44px; text-align: right; }
 .zbtn {
-  appearance: none; width: 28px; height: 26px; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--surface-2); color: var(--ink); cursor: pointer; font: 500 14px var(--sans); line-height: 1;
+  appearance: none; min-width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--ink); cursor: pointer; font: 500 17px var(--sans); line-height: 1;
+  touch-action: manipulation;
 }
-.zbtn.wide { width: auto; padding: 0 10px; font-size: 12px; }
-.mapscroll { overflow: auto; max-height: min(74vh, 780px); background: var(--paper); }
-.mapcanvas { --sw: 30px; --sh: 9px; transform-origin: 0 0; padding: 14px; display: flex; flex-direction: column; gap: 16px; width: max-content; }
+.zbtn.wide { padding: 0 14px; font-size: 13px; }
+.mapscroll {
+  overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; overscroll-behavior: contain;
+  flex: 1; min-height: 340px;
+}
+/*
+ * transform: scale() は要素が占める領域を変えないので、canvas をそのままスクロール領域に
+ * 置くと縮小しても元の大きさぶんスクロールできてしまい、下や右に大きな空白が出る。
+ * 外側の sizer に「実寸 × 倍率」を持たせて、スクロール範囲を見た目に合わせる。
+ */
+.mapsizer { position: relative; }
+.mapcanvas {
+  --sw: 26px; --sh: 8px;
+  position: absolute; top: 0; left: 0;
+  transform-origin: 0 0; padding: 18px; width: max-content;
+  display: flex; flex-direction: column; gap: 34px;
+}
 
-.marea { display: flex; flex-direction: column; gap: 6px; }
-.marea > h3 { margin: 0; font: 600 12px var(--sans); color: var(--muted); }
-.mhalls { display: flex; gap: 14px; align-items: flex-start; }
-.mhall { display: flex; flex-direction: column; gap: 5px; }
-.mhall > .name { font: 600 11.5px var(--mono); color: var(--muted); }
+.marea { display: flex; flex-direction: column; gap: 10px; }
+.marea > h3 { margin: 0; font: 600 13px var(--sans); color: var(--muted); }
+/* ホール列。ホール同士は大きく空ける —— 会場でも間が空いている */
+.mhallrow { display: flex; gap: 46px; align-items: flex-start; }
+.mhallrows { display: flex; flex-direction: column; gap: 30px; }
+.mhall {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px 10px; background: var(--surface-2);
+}
+.mhall > .name { font: 700 12px var(--mono); color: var(--muted); }
 .mhall[data-area="東"] > .name { color: var(--east); }
 .mhall[data-area="西"] > .name { color: var(--west); }
 .mhall[data-area="南"] > .name { color: var(--south); }
-.islands { display: flex; gap: 6px; align-items: flex-start; }
+/* 壁サークルはホールの端に置く */
+.hallbody { display: flex; gap: 14px; align-items: flex-start; }
+.hsections { display: flex; flex-direction: column; gap: 22px; }
+/* 段の中のまとまり同士は通路ぶん空ける */
+.hsection { display: flex; gap: 20px; align-items: flex-start; }
+.hgroup { display: flex; gap: 5px; align-items: flex-start; }
 
 .island { display: flex; flex-direction: column; gap: 3px; align-items: center; }
 .island > .blk { font: 700 12px var(--mono); color: var(--ink); }
+.island.wall > .blk { writing-mode: horizontal-tb; }
 /*
- * 島は 2 列。背景の横線でスペースの区切りを描くので、空きスペースぶんの
- * 要素は作らない —— 800 サークル規模で 6000 個の空マスを置くと重すぎる。
+ * 島は 2 列。空きスペースは背景の線で描くので要素を作らない ——
+ * 800 サークル規模で 6000 個の空マスを置くと重すぎる。
  */
 .grid2 {
   display: grid; grid-template-columns: repeat(2, var(--sw));
@@ -192,7 +216,7 @@ body {
   appearance: none; border: 0; padding: 0 2px; margin: 0; cursor: pointer; overflow: hidden;
   background: var(--accent-soft); color: var(--accent); text-align: left;
   font: 600 7px/1 var(--sans); display: flex; align-items: center; white-space: nowrap;
-  outline: 1px solid var(--accent);
+  outline: 1px solid var(--accent); touch-action: manipulation;
 }
 .sp[data-area="東"] { background: var(--east-soft); color: var(--east); outline-color: var(--east); }
 .sp[data-area="西"] { background: var(--west-soft); color: var(--west); outline-color: var(--west); }
@@ -202,7 +226,7 @@ body {
 .sp[data-mark="skip"] { opacity: .35; }
 .sp .num { opacity: .65; margin-right: 2px; font-variant-numeric: tabular-nums; }
 
-/* 縮小時は文字を出さない。島とブロック記号だけで全体の当たりを見る */
+/* 縮小時は文字を出さない。読めない字を並べても意味がなく、描画も重い */
 .mapcanvas[data-detail="0"] .sp { font-size: 0; padding: 0; }
 .mapcanvas[data-detail="0"] .grid2 { background-image: none; }
 .mapcanvas[data-detail="1"] .sp .nm { display: none; }
@@ -352,11 +376,40 @@ body {
   #printtable th { background: #eee; }
 }
 
-@media (max-width: 560px) {
-  .wrap { padding: 16px 11px 56px; gap: 14px; }
-  .grid { grid-template-columns: 1fr; }
-  .count { margin-left: 0; width: 100%; }
+/* 絞り込みの開閉ボタン。狭い画面でだけ出す */
+#filter-toggle { display: none; }
+
+/* --- 手のひらで使う前提の調整 --- */
+@media (max-width: 720px) {
+  /*
+   * 狭い画面ではチップが何段にも折り返して、地図が画面外まで押し下げられていた。
+   * 見出しの数字はタブにも出ているので省き、絞り込みは畳んで、まず地図を見せる。
+   */
+  .summary, .gen { display: none; }
+  #filter-toggle { display: inline-flex; align-items: center; }
+  body:not(.filters-open) .toolbar > .chips { display: none; }
+  body:not(.filters-open) .count { display: none; }
   .toolbar { position: static; }
+
+  .wrap { padding: 12px 10px 40px; gap: 12px; }
+  .grid { grid-template-columns: 1fr; }
+  .head h1 { font-size: 20px; }
+  .summary { gap: 14px; }
+
+  /* 指で押せる大きさにする */
+  .tab { padding: 12px 14px; font-size: 15px; min-height: 46px; }
+  .chip { padding: 10px 13px; font-size: 14px; min-height: 42px; }
+  .mk { padding: 10px 12px; font-size: 13px; min-height: 42px; }
+  .toolbar input[type=search] { min-height: 44px; font-size: 16px; } /* 16px 未満だと iOS が勝手に拡大する */
+  .toolbar { padding: 9px; gap: 7px; }
+  .count { margin-left: 0; width: 100%; text-align: right; }
+
+  #panel { width: 100vw; border-left: 0; }
+  #panel .close { width: 44px; height: 44px; font-size: 24px; }
+  .mapscroll { min-height: 66vh; }
+  .mapbar { padding: 6px 0 8px; }
+  .mapbar .note { display: none; }
+  .ltable th, .ltable td { padding: 10px 8px; }
 }
 `;
 
@@ -379,8 +432,8 @@ function official(b) {
   return hall ? { area: b.area, hall, block: BLOCK_OF[key] } : null;
 }
 
-const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false,
-  grouped: true, sort: 'space', view: 'map', markFilter: new Set(), buyFilter: 'all' };
+const state = { tab: 'map', kind: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false,
+  grouped: true, sort: 'space', view: 'cards', markFilter: new Set(), buyFilter: 'all' };
 
 /**
  * チェック・購入・メモは端末内(localStorage)にだけ保存する。サーバは無い。
@@ -618,9 +671,9 @@ function rowHtml(e) {
   '</tr>';
 }
 
-/** タブごとの現在の一覧。グループ化の有無で件数そのものが変わる */
-function rowsFor(tab) {
-  return state.grouped ? groupByAccount(DATA[tab]) : DATA[tab];
+/** 現在の一覧。グループ化の有無で件数そのものが変わる */
+function rowsFor(kind) {
+  return state.grouped ? groupByAccount(DATA[kind]) : DATA[kind];
 }
 
 /**
@@ -657,42 +710,63 @@ function spaceCell(num, total) {
   return { col: 1, row: Math.min(num - half, half) };
 }
 
-function islandHtml(area, hall, block, total, spaces) {
+function islandHtml(area, hallNo, block, total, spaces, isWall) {
+  // 実データが目安を超えていたら島を伸ばす。番号が枠外に落ちて消えるより良い
+  let maxNum = total;
+  for (let n = total + 1; n <= total + 30; n++) {
+    if (spaces.has(area + '/' + hallNo + '/' + block + '/' + n)) maxNum = n;
+  }
+  const half = Math.ceil(maxNum / 2);
+
   let cells = '';
-  for (let n = 1; n <= total; n++) {
-    const at = spaces.get(area + '/' + hall + '/' + block + '/' + n);
+  for (let n = 1; n <= maxNum; n++) {
+    const at = spaces.get(area + '/' + hallNo + '/' + block + '/' + n);
     if (!at || !at.length) continue;
-    const { col, row } = spaceCell(n, total);
+    const { col, row } = spaceCell(n, maxNum);
     const names = at.map(e => e.circleName || e.displayName);
     const mark = markOf(at[0].screenName).s;
     cells += '<button class="sp" type="button" data-area="' + esc(area) + '"' +
       (mark ? ' data-mark="' + mark + '"' : '') +
       ' data-sn="' + esc(at[0].screenName) + '" style="grid-column:' + col + ';grid-row:' + row + '"' +
-      ' title="' + esc(area + hall + ' ' + block + '-' + String(n).padStart(2, '0') + '  ' + names.join(' / ')) + '">' +
+      ' title="' + esc(area + hallNo + ' ' + block + '-' + String(n).padStart(2, '0') + '  ' + names.join(' / ')) + '">' +
       '<span class="num">' + n + '</span><span class="nm">' + esc(names.join('/')) + '</span></button>';
   }
-  const half = Math.ceil(total / 2);
-  return '<div class="island"><span class="blk">' + esc(block) + '</span>' +
+  return '<div class="island' + (isWall ? ' wall' : '') + '"><span class="blk">' + esc(block) + '</span>' +
     '<div class="grid2" style="grid-template-rows:repeat(' + half + ',var(--sh))">' + cells + '</div></div>';
+}
+
+/** ホール 1 つ。段 → 通路で区切られたまとまり → 島、の順に組む */
+function hallHtml(area, hall, spaces) {
+  const island = (b, isWall) => islandHtml(area, hall.hall, b, hall.spaces, spaces, isWall);
+
+  const sections = hall.rows.map(row =>
+    '<div class="hsection">' + row.map(group =>
+      '<div class="hgroup">' + group.map(b => island(b, false)).join('') + '</div>'
+    ).join('') + '</div>'
+  ).join('');
+
+  const wall = hall.wall ? island(hall.wall.block, true) : '';
+  const body = hall.wall && hall.wall.side === 'left'
+    ? wall + '<div class="hsections">' + sections + '</div>'
+    : '<div class="hsections">' + sections + '</div>' + wall;
+
+  return '<div class="mhall" data-area="' + esc(area) + '"><span class="name">' + esc(area + hall.hall) +
+         'ホール</span><div class="hallbody">' + body + '</div></div>';
 }
 
 function renderMap(rows) {
   const wrap = document.getElementById('mapwrap');
-  if (state.tab !== 'circles') { wrap.hidden = true; return; }
+  if (state.tab !== 'map') { wrap.hidden = true; return; }
   wrap.hidden = false;
 
   const { spaces, strays } = buildSpaceIndex(rows);
   let html = '';
 
-  for (const { area, halls } of VENUE) {
-    let hallsHtml = '';
-    for (const { hall, blocks, spaces: total } of halls) {
-      // 配置図と同じ向きにする: ア/あ/a が右端に来るよう、ブロックは逆順に並べる
-      const islands = [...blocks].reverse().map(b => islandHtml(area, hall, b, total, spaces)).join('');
-      hallsHtml += '<div class="mhall" data-area="' + esc(area) + '"><span class="name">' + esc(area + hall) +
-                   'ホール</span><div class="islands">' + islands + '</div></div>';
-    }
-    html += '<div class="marea"><h3>' + esc(area) + '地区</h3><div class="mhalls">' + hallsHtml + '</div></div>';
+  for (const { area, rows: hallRows } of VENUE) {
+    const body = hallRows.map(hr =>
+      '<div class="mhallrow">' + hr.map(h => hallHtml(area, h, spaces)).join('') + '</div>'
+    ).join('');
+    html += '<div class="marea"><h3>' + esc(area) + '地区</h3><div class="mhallrows">' + body + '</div></div>';
   }
 
   if (strays.size) {
@@ -701,63 +775,85 @@ function renderMap(rows) {
   }
 
   document.getElementById('mapcanvas').innerHTML = html;
+  measureCanvas();
+  applyZoom(zoom);
 }
 
 // --- 拡大縮小 ---
 let zoom = 1;
+let natural = { w: 0, h: 0 };
+
+/** 倍率 1 のときの実寸。描き直すたびに測り直す */
+function measureCanvas() {
+  const canvas = document.getElementById('mapcanvas');
+  const t = canvas.style.transform;
+  canvas.style.transform = 'none';
+  natural = { w: canvas.scrollWidth, h: canvas.scrollHeight };
+  canvas.style.transform = t;
+}
+
 function applyZoom(z) {
-  zoom = Math.min(4, Math.max(0.25, z));
+  // 下限は低めに。会場は横に長いので、狭い画面だと全体表示で 10% 台になる。
+  // 縮小時は文字を出さないので、小さくても輪郭の見取り図としては成立する
+  zoom = Math.min(4, Math.max(0.07, z));
   const canvas = document.getElementById('mapcanvas');
   canvas.style.transform = 'scale(' + zoom + ')';
+
+  // スクロール範囲を見た目の大きさに合わせる
+  const sizer = document.getElementById('mapsizer');
+  sizer.style.width = Math.round(natural.w * zoom) + 'px';
+  sizer.style.height = Math.round(natural.h * zoom) + 'px';
+
   // 縮小時は文字を出さない。読めない字を並べても意味がないし、描画も重い
   canvas.dataset.detail = zoom < 0.7 ? '0' : zoom < 1.25 ? '1' : '2';
   document.getElementById('zoomlabel').textContent = Math.round(zoom * 100) + '%';
-  const scroll = document.getElementById('mapscroll');
-  scroll.style.height = Math.min(780, canvas.scrollHeight * zoom + 28) + 'px';
 }
 
-/** 会場全体が横幅に収まる倍率 */
+/** 会場全体が幅に収まる倍率にして左上へ戻す */
 function fitZoom() {
-  const canvas = document.getElementById('mapcanvas');
+  measureCanvas();
   const scroll = document.getElementById('mapscroll');
-  canvas.style.transform = 'scale(1)';
-  const w = canvas.scrollWidth;
-  applyZoom(w ? (scroll.clientWidth - 8) / w : 1);
+  const pad = 4;
+  applyZoom(natural.w ? (scroll.clientWidth - pad) / natural.w : 1);
+  scroll.scrollTo(0, 0);
 }
 
 function render() {
-  const all = rowsFor(state.tab);
-  // マップはマス選択以外の絞り込みを反映する —— 検索した結果の分布が見えないと索引の意味がない
+  const onMap = state.tab === 'map';
+  const kind = onMap ? 'circles' : state.tab;
+  const all = rowsFor(kind);
   const base = all.filter(matches);
-  renderMap(base);
   const list = base.sort(state.sort === 'space' ? bySpace : byNewest);
+  lastList = list;
+
+  renderMap(base);
   document.getElementById('count').textContent =
     list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
 
-  // 見出しとタブの数字もグループ化に追随させる。ここがツイート数のままだと
-  // 一覧の件数と食い違って見える
-  for (const tab of ['circles', 'cosplayers', 'unclassified']) {
-    const n = rowsFor(tab).length;
-    document.querySelector('.tab[data-tab="' + tab + '"] .n').textContent = n;
-    const stat = document.getElementById('stat-' + tab);
+  for (const t of ['circles', 'cosplayers', 'unclassified']) {
+    const n = rowsFor(t).length;
+    const badge = document.querySelector('.tab[data-tab="' + t + '"] .n');
+    if (badge) badge.textContent = n;
+    const stat = document.getElementById('stat-' + t);
     if (stat) stat.textContent = n;
   }
-  document.getElementById('area-filter').hidden = state.tab !== 'circles';
-
-  lastList = list;
+  // 地区で絞れるのはサークルだけ。地図タブでは常に出す
+  document.getElementById('area-filter').hidden = !onMap && state.tab !== 'circles';
+  document.querySelector('.viewpick').hidden = onMap;
+  // CSV・印刷・持ち出しは一覧のための道具。地図では場所を取るだけなので隠す
+  document.querySelector('.toolbar2').hidden = onMap;
 
   const grid = document.getElementById('grid');
   const twrap = document.getElementById('ltable-wrap');
 
-  document.getElementById('mapwrap').hidden = state.tab !== 'circles' || state.view !== 'map';
-
-  if (state.view === 'map') {
+  if (onMap) {
     grid.hidden = true;
-    twrap.hidden = false;
-    twrap.innerHTML = '<table class="ltable"><thead><tr>' +
-      '<th>状態</th><th>配置</th><th>サークル</th><th>金額</th><th>メモ</th><th></th>' +
-      '</tr></thead><tbody>' + list.slice(0, 60).map(rowHtml).join('') + '</tbody></table>';
-  } else if (state.view === 'table') {
+    twrap.hidden = true;
+    document.getElementById('empty').hidden = true;
+    return;
+  }
+
+  if (state.view === 'table') {
     grid.hidden = true;
     twrap.hidden = false;
     twrap.innerHTML = '<table class="ltable"><thead><tr>' +
@@ -772,6 +868,8 @@ function render() {
   }
   document.getElementById('empty').hidden = list.length > 0;
 }
+
+let lastList = [];
 
 /**
  * カードは少しずつ足す。
@@ -806,8 +904,6 @@ function appendChunk() {
 
   sentinel.hidden = !queue.length;
 }
-
-let lastList = [];
 
 /** 今の絞り込み・並び順のまま CSV にする(Excel 向けに BOM 付き UTF-8) */
 function buildCsv() {
@@ -856,10 +952,13 @@ function printList() {
 
 /** 詳細パネル: そのアカウントの全投稿と、印・メモの編集 */
 function openPanel(sn) {
-  const posts = DATA[state.tab].filter(e => e.screenName === sn)
+  // タブに関係なく開けるようにする。地図タブでは DATA['map'] などという配列は無いし、
+  // サークル兼レイヤーはどちらの一覧からでも開かれうる
+  const kind = ['circles', 'cosplayers', 'unclassified'].find(k => DATA[k].some(e => e.screenName === sn));
+  if (!kind) return;
+  const posts = DATA[kind].filter(e => e.screenName === sn)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  if (!posts.length) return;
-  const head = (state.grouped ? rowsFor(state.tab) : posts).find(e => e.screenName === sn) || posts[0];
+  const head = (state.grouped ? rowsFor(kind) : posts).find(e => e.screenName === sn) || posts[0];
   const m = markOf(sn);
 
   document.getElementById('panel-body').innerHTML =
@@ -911,6 +1010,12 @@ document.querySelector('.tabs').addEventListener('click', ev => {
   state.tab = tab.dataset.tab;
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t === tab));
   render();
+  if (state.tab === 'map') fitZoom();
+});
+
+document.getElementById('filter-toggle').addEventListener('click', ev => {
+  const open = document.body.classList.toggle('filters-open');
+  ev.currentTarget.setAttribute('aria-expanded', String(open));
 });
 
 document.getElementById('q').addEventListener('input', ev => {
@@ -963,7 +1068,6 @@ document.querySelector('.viewpick').addEventListener('click', ev => {
   state.view = b.dataset.view;
   for (const c of document.querySelectorAll('.viewpick .chip')) c.setAttribute('aria-pressed', String(c === b));
   render();
-  if (state.view === 'map') fitZoom();
 });
 
 document.getElementById('csv-btn').addEventListener('click', () =>
@@ -1059,9 +1163,60 @@ document.getElementById('mapcanvas').addEventListener('click', ev => {
   if (sp) openPanel(sp.dataset.sn);
 });
 
-document.getElementById('zoom-in').addEventListener('click', () => applyZoom(zoom * 1.3));
-document.getElementById('zoom-out').addEventListener('click', () => applyZoom(zoom / 1.3));
+document.getElementById('zoom-in').addEventListener('click', () => applyZoom(zoom * 1.4));
+document.getElementById('zoom-out').addEventListener('click', () => applyZoom(zoom / 1.4));
 document.getElementById('zoom-fit').addEventListener('click', fitZoom);
+
+/*
+ * 指での操作。1 本指のドラッグは要素の overflow がそのままスクロールしてくれるので、
+ * ここで面倒を見るのは 2 本指のつまみ操作だけ。
+ * つまんだ中心が動かないようスクロール位置を補正しないと、拡大するたびに違う場所へ飛ぶ。
+ */
+const mapScroll = document.getElementById('mapscroll');
+let pinch = null;
+
+const touchDist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+const touchMid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+
+mapScroll.addEventListener('touchstart', ev => {
+  if (ev.touches.length !== 2) return;
+  const t = [ev.touches[0], ev.touches[1]];
+  const mid = touchMid(t);
+  const box = mapScroll.getBoundingClientRect();
+  pinch = {
+    dist: touchDist(t),
+    zoom,
+    // つまんだ点が中身のどこかを、今の倍率で覚えておく
+    cx: (mapScroll.scrollLeft + mid.x - box.left) / zoom,
+    cy: (mapScroll.scrollTop + mid.y - box.top) / zoom,
+  };
+}, { passive: true });
+
+mapScroll.addEventListener('touchmove', ev => {
+  if (!pinch || ev.touches.length !== 2) return;
+  ev.preventDefault();
+  const t = [ev.touches[0], ev.touches[1]];
+  applyZoom(pinch.zoom * (touchDist(t) / pinch.dist));
+
+  const mid = touchMid(t);
+  const box = mapScroll.getBoundingClientRect();
+  mapScroll.scrollLeft = pinch.cx * zoom - (mid.x - box.left);
+  mapScroll.scrollTop = pinch.cy * zoom - (mid.y - box.top);
+}, { passive: false });
+
+mapScroll.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; }, { passive: true });
+
+// 素早く 2 回叩いたら拡大、拡大済みなら全体へ戻す
+let lastTap = 0;
+mapScroll.addEventListener('touchend', ev => {
+  if (ev.touches.length || pinch) return;
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    if (ev.target.closest('.sp')) return; // スペースを開く操作を邪魔しない
+    zoom > 1 ? fitZoom() : applyZoom(1.8);
+  }
+  lastTap = now;
+}, { passive: true });
 
 const lightbox = document.getElementById('lightbox');
 document.getElementById('grid').addEventListener('click', ev => {
@@ -1136,13 +1291,15 @@ export function renderHtml(dataset: Dataset): string {
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab" type="button" role="tab" data-tab="circles" aria-selected="true">サークル<span class="n">${stats.circles}</span></button>
+    <button class="tab" type="button" role="tab" data-tab="map" aria-selected="true">地図</button>
+    <button class="tab" type="button" role="tab" data-tab="circles" aria-selected="false">サークル<span class="n">${stats.circles}</span></button>
     <button class="tab" type="button" role="tab" data-tab="cosplayers" aria-selected="false">コスプレイヤー<span class="n">${stats.cosplayers}</span></button>
     <button class="tab" type="button" role="tab" data-tab="unclassified" aria-selected="false">未分類<span class="n">${stats.unclassified}</span></button>
   </nav>
 
   <div class="toolbar">
     <input id="q" type="search" placeholder="サークル名 / 作者 / キャラ / 作品 / 本文 を検索">
+    <button class="chip" type="button" id="filter-toggle" aria-expanded="false">絞り込み</button>
     <div class="chips" id="day-filter">${dayChips}</div>
     <div class="chips" id="area-filter">
       <button class="chip" type="button" data-value="東" aria-pressed="false">東</button>
@@ -1164,8 +1321,7 @@ export function renderHtml(dataset: Dataset): string {
 
   <div class="toolbar2">
     <div class="chips viewpick">
-      <button class="chip" type="button" data-view="map" aria-pressed="true">地図</button>
-      <button class="chip" type="button" data-view="cards" aria-pressed="false">カード</button>
+      <button class="chip" type="button" data-view="cards" aria-pressed="true">カード</button>
       <button class="chip" type="button" data-view="table" aria-pressed="false">表</button>
     </div>
     <span class="spacer"></span>
@@ -1188,7 +1344,7 @@ export function renderHtml(dataset: Dataset): string {
         <span id="zoomlabel">100%</span>
       </div>
     </div>
-    <div class="mapscroll" id="mapscroll"><div class="mapcanvas" id="mapcanvas" data-detail="1"></div></div>
+    <div class="mapscroll" id="mapscroll"><div class="mapsizer" id="mapsizer"><div class="mapcanvas" id="mapcanvas" data-detail="1"></div></div></div>
   </div>
 
   <div class="grid" id="grid"></div>

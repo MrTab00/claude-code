@@ -58,8 +58,15 @@ try {
             return getComputedStyle(el).display !== 'none' && r.width > 0 && r.height > 0;
         })()`);
 
-    // 既定は地図。一覧を読むより先に「どこにいるか」が見えるべき
+    // 既定は地図タブ。一覧を読むより先に「どこにいるか」が見えるべき
     check('最初に地図が出ている', await shown('#mapwrap'));
+    check('地図タブが選ばれている', (await page.evaluate<string>('state.tab')) === 'map');
+    // 縮小しても中身の大きさに合わせてスクロール範囲が縮むこと(下に空白が伸びない)
+    check('スクロール範囲が見た目に追随する', await page.evaluate<boolean>(`(() => {
+        const sizer = document.getElementById('mapsizer').getBoundingClientRect();
+        const canvas = document.getElementById('mapcanvas').getBoundingClientRect();
+        return Math.abs(sizer.height - canvas.height) < 4 && Math.abs(sizer.width - canvas.width) < 4;
+    })()`));
     check('地図の島が描かれている', (await page.evaluate<number>('document.querySelectorAll(".island").length')) === 115);
     check('初期状態で詳細パネルは出ていない', !(await shown('#panel')));
     check('初期状態で背景の覆いは出ていない', !(await shown('#backdrop')));
@@ -85,10 +92,14 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     check('拡大時はサークル名を出す', (await page.evaluate<string>('document.getElementById("mapcanvas").dataset.detail')) === '2');
 
+    // 一覧はタブを移ってから
+    await page.evaluate(`document.querySelector('.tab[data-tab="circles"]').click()`);
+    await new Promise((r) => setTimeout(r, 250));
+    check('サークルタブで地図が消える', !(await shown('#mapwrap')));
+
     await page.evaluate(`document.querySelector('.viewpick .chip[data-view="table"]').click()`);
     await new Promise((r) => setTimeout(r, 250));
     check('表ビューで表が出る', await shown('#ltable-wrap'));
-    check('表ビューでは地図を出さない', !(await shown('#mapwrap')));
     check('表ビューでカードは出ない', !(await shown('#grid')));
 
     await page.evaluate(`document.querySelector('.viewpick .chip[data-view="cards"]').click()`);
@@ -106,6 +117,20 @@ try {
     await new Promise((r) => setTimeout(r, 250));
     check('コスプレタブで地図が消える', !(await shown('#mapwrap')));
     check('コスプレタブで地区チップが消える', !(await shown('#area-filter')));
+
+    // 狭い画面では絞り込みを畳んで、まず地図を見せる
+    await conn.send('Emulation.setDeviceMetricsOverride',
+        { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, page.sessionId);
+    await page.evaluate(`document.querySelector('.tab[data-tab="map"]').click()`);
+    await new Promise((r) => setTimeout(r, 400));
+    check('狭い画面ではチップを畳む', !(await shown('#day-filter')));
+    check('畳むボタンが出る', await shown('#filter-toggle'));
+    // 畳んでいる状態でこそ、地図が最初の画面に入る
+    check('地図が画面の上のほうに来る', await page.evaluate<boolean>(
+        `document.getElementById('mapscroll').getBoundingClientRect().top < 450`));
+    await page.evaluate(`document.getElementById('filter-toggle').click()`);
+    await new Promise((r) => setTimeout(r, 250));
+    check('押すとチップが出る', await shown('#day-filter'));
 
     await page.close();
     conn.close();
