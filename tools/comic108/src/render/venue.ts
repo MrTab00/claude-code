@@ -14,6 +14,11 @@ export interface Hall {
     hall: string;
     /** そのホールのブロック。配置図で左→右に並んでいる順ではなく、五十音・アルファベット順 */
     blocks: string[];
+    /**
+     * 1 ブロックあたりのスペース数。配置図から読んだおおよその上限。
+     * 島は 2 列で、右列を下から上へ 1..N/2、左列を上から下へ N/2+1..N と蛇行する。
+     */
+    spaces: number;
 }
 
 export type Area = '東' | '西' | '南';
@@ -33,24 +38,24 @@ export const VENUE: { area: Area; halls: Hall[] }[] = [
     {
         area: '東',
         halls: [
-            { hall: '7', blocks: seq('A', 'W') },
-            { hall: '3', blocks: KATAKANA.slice(26) }, // ヒ〜ヨ
-            { hall: '2', blocks: KATAKANA.slice(14, 26) }, // ソ〜ハ
-            { hall: '1', blocks: KATAKANA.slice(0, 14) }, // ア〜セ
+            { hall: '7', blocks: seq('A', 'W'), spaces: 48 },
+            { hall: '3', blocks: KATAKANA.slice(26), spaces: 52 }, // ヒ〜ヨ
+            { hall: '2', blocks: KATAKANA.slice(14, 26), spaces: 52 }, // ソ〜ハ
+            { hall: '1', blocks: KATAKANA.slice(0, 14), spaces: 52 }, // ア〜セ
         ],
     },
     {
         area: '西',
         halls: [
-            { hall: '1', blocks: HIRAGANA.slice(17) }, // つ〜め
-            { hall: '2', blocks: HIRAGANA.slice(0, 17) }, // あ〜ち
+            { hall: '1', blocks: HIRAGANA.slice(17), spaces: 52 }, // つ〜め
+            { hall: '2', blocks: HIRAGANA.slice(0, 17), spaces: 52 }, // あ〜ち
         ],
     },
     {
         area: '南',
         halls: [
-            { hall: '1', blocks: seq('h', 't') },
-            { hall: '2', blocks: seq('a', 'g') },
+            { hall: '1', blocks: seq('h', 't'), spaces: 46 },
+            { hall: '2', blocks: seq('a', 'g'), spaces: 46 },
         ],
     },
 ];

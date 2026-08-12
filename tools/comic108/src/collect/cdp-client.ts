@@ -168,12 +168,17 @@ export async function openPage(conn: CdpConnection, viewport?: Viewport): Promis
         },
 
         async evaluate<T>(expression: string): Promise<T> {
-            const res = await conn.send<{ result?: { value?: T }; exceptionDetails?: { text: string } }>(
-                'Runtime.evaluate',
-                { expression, returnByValue: true, awaitPromise: true },
-                sessionId,
-            );
-            if (res.exceptionDetails) throw new Error(res.exceptionDetails.text);
+            const res = await conn.send<{
+                result?: { value?: T };
+                exceptionDetails?: { text?: string; exception?: { description?: string } };
+            }>('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+
+            if (res.exceptionDetails) {
+                // text だけだと「Uncaught」しか出ず、どこで何が起きたのか分からない。
+                // 実際のメッセージとスタックは exception.description に入っている
+                const detail = res.exceptionDetails.exception?.description ?? res.exceptionDetails.text ?? '不明なエラー';
+                throw new Error(`${detail}\n  式: ${expression.replace(/\s+/g, ' ').slice(0, 160)}`);
+            }
             return res.result?.value as T;
         },
 

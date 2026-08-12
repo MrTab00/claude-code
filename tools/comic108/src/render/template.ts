@@ -144,61 +144,71 @@ body {
 .chip[data-value="南"][aria-pressed="true"] { background: var(--south-soft); border-color: var(--south); color: var(--south); }
 .count { margin-left: auto; font: 500 12.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 
-/* --- 配置マップ: 公式のホール構成に合わせたブロック索引 --- */
-.arearow { display: flex; flex-direction: column; gap: 7px; }
-.arearow > h3 { font-size: 12px; margin: 0; color: var(--muted); font-weight: 600; }
-.halls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
-.hall {
-  border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px 8px;
-  display: flex; flex-direction: column; gap: 5px; background: var(--surface-2);
-}
-.hall > .name { font: 600 11.5px var(--mono); color: var(--muted); }
-.hall[data-area="東"] > .name { color: var(--east); }
-.hall[data-area="西"] > .name { color: var(--west); }
-.hall[data-area="南"] > .name { color: var(--south); }
-.cell[data-level="0"] { opacity: .32; cursor: default; }
-
-/* --- 配置マップ --- */
-.mapview {
+/* --- 地図: 公式のホール構成に沿った島レイアウト --- */
+.mapwrap {
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  padding: 12px 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column;
 }
-.mapview > header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.mapview h2 { font-size: 14px; margin: 0; font-weight: 600; }
-.mapview .note { font-size: 11.5px; color: var(--muted); }
-.mapview .note a { color: var(--accent); }
-.mapview .clear {
-  margin-left: auto; appearance: none; border: 1px solid var(--accent); background: var(--accent-soft);
-  color: var(--accent); border-radius: 6px; padding: 4px 10px; font: 500 12px var(--sans); cursor: pointer;
+.mapbar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 9px 12px; border-bottom: 1px solid var(--border);
 }
-.dayblock { display: flex; flex-direction: column; gap: 6px; }
-.dayblock > h3 { font-size: 12px; margin: 0; color: var(--muted); font-weight: 600; }
-.hallrow { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
-.hallrow > .label {
-  font: 600 11.5px var(--mono); color: var(--muted); min-width: 76px; padding-top: 5px;
-  font-variant-numeric: tabular-nums;
+.mapbar .note { font-size: 11.5px; color: var(--muted); }
+.mapbar .note a { color: var(--accent); }
+.mapbar .zoom { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.mapbar .zoom span { font: 500 12px var(--mono); color: var(--muted); min-width: 46px; text-align: right; }
+.zbtn {
+  appearance: none; width: 28px; height: 26px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); color: var(--ink); cursor: pointer; font: 500 14px var(--sans); line-height: 1;
 }
-.cells { display: flex; gap: 4px; flex-wrap: wrap; }
-.cell {
-  appearance: none; cursor: pointer; border-radius: 5px; padding: 3px 0 4px;
-  width: 34px; text-align: center; border: 1px solid var(--border); background: var(--surface);
-  display: flex; flex-direction: column; gap: 1px; line-height: 1.15;
-}
-.cell b { font: 600 13px var(--mono); color: var(--ink); }
-.cell i { font: 500 10.5px var(--mono); font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
-.cell[data-area="東"] { border-color: color-mix(in srgb, var(--east) 35%, var(--border)); }
-.cell[data-area="西"] { border-color: color-mix(in srgb, var(--west) 35%, var(--border)); }
-.cell[data-area="南"] { border-color: color-mix(in srgb, var(--south) 35%, var(--border)); }
-.cell[data-level="2"][data-area="東"] { background: var(--east-soft); }
-.cell[data-level="2"][data-area="西"] { background: var(--west-soft); }
-.cell[data-level="2"][data-area="南"] { background: var(--south-soft); }
-.cell[data-level="3"][data-area="東"] { background: var(--east-soft); box-shadow: inset 0 0 0 1px var(--east); }
-.cell[data-level="3"][data-area="西"] { background: var(--west-soft); box-shadow: inset 0 0 0 1px var(--west); }
-.cell[data-level="3"][data-area="南"] { background: var(--south-soft); box-shadow: inset 0 0 0 1px var(--south); }
-.cell[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
-.cell[aria-pressed="true"] b, .cell[aria-pressed="true"] i { color: var(--accent-ink); }
+.zbtn.wide { width: auto; padding: 0 10px; font-size: 12px; }
+.mapscroll { overflow: auto; max-height: min(74vh, 780px); background: var(--paper); }
+.mapcanvas { --sw: 30px; --sh: 9px; transform-origin: 0 0; padding: 14px; display: flex; flex-direction: column; gap: 16px; width: max-content; }
 
-/* --- カード --- */
+.marea { display: flex; flex-direction: column; gap: 6px; }
+.marea > h3 { margin: 0; font: 600 12px var(--sans); color: var(--muted); }
+.mhalls { display: flex; gap: 14px; align-items: flex-start; }
+.mhall { display: flex; flex-direction: column; gap: 5px; }
+.mhall > .name { font: 600 11.5px var(--mono); color: var(--muted); }
+.mhall[data-area="東"] > .name { color: var(--east); }
+.mhall[data-area="西"] > .name { color: var(--west); }
+.mhall[data-area="南"] > .name { color: var(--south); }
+.islands { display: flex; gap: 6px; align-items: flex-start; }
+
+.island { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.island > .blk { font: 700 12px var(--mono); color: var(--ink); }
+/*
+ * 島は 2 列。背景の横線でスペースの区切りを描くので、空きスペースぶんの
+ * 要素は作らない —— 800 サークル規模で 6000 個の空マスを置くと重すぎる。
+ */
+.grid2 {
+  display: grid; grid-template-columns: repeat(2, var(--sw));
+  border: 1px solid var(--border); background: var(--surface);
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--sh) - 1px), var(--border) calc(var(--sh) - 1px) var(--sh)),
+    linear-gradient(to right, transparent calc(50% - 0.5px), var(--border) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+.sp {
+  appearance: none; border: 0; padding: 0 2px; margin: 0; cursor: pointer; overflow: hidden;
+  background: var(--accent-soft); color: var(--accent); text-align: left;
+  font: 600 7px/1 var(--sans); display: flex; align-items: center; white-space: nowrap;
+  outline: 1px solid var(--accent);
+}
+.sp[data-area="東"] { background: var(--east-soft); color: var(--east); outline-color: var(--east); }
+.sp[data-area="西"] { background: var(--west-soft); color: var(--west); outline-color: var(--west); }
+.sp[data-area="南"] { background: var(--south-soft); color: var(--south); outline-color: var(--south); }
+.sp[data-mark="must"] { background: var(--accent); color: var(--accent-ink); outline-color: var(--accent); }
+.sp[data-mark="like"] { outline-width: 2px; }
+.sp[data-mark="skip"] { opacity: .35; }
+.sp .num { opacity: .65; margin-right: 2px; font-variant-numeric: tabular-nums; }
+
+/* 縮小時は文字を出さない。島とブロック記号だけで全体の当たりを見る */
+.mapcanvas[data-detail="0"] .sp { font-size: 0; padding: 0; }
+.mapcanvas[data-detail="0"] .grid2 { background-image: none; }
+.mapcanvas[data-detail="1"] .sp .nm { display: none; }
+.mapcanvas[data-detail="1"] .sp { font-size: 6.5px; }
+
+/* --- カード --- *//* --- カード --- */
 .grid { display: grid; gap: 13px; grid-template-columns: repeat(auto-fill, minmax(322px, 1fr)); }
 .card {
   position: relative; overflow: hidden;
@@ -370,7 +380,7 @@ function official(b) {
 }
 
 const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false,
-  grouped: true, sort: 'space', cell: null, view: 'cards', markFilter: new Set(), buyFilter: 'all' };
+  grouped: true, sort: 'space', view: 'map', markFilter: new Set(), buyFilter: 'all' };
 
 /**
  * チェック・購入・メモは端末内(localStorage)にだけ保存する。サーバは無い。
@@ -495,17 +505,6 @@ function groupByAccount(list) {
 }
 const entryAreas = e => [...new Set((e.booths || []).map(b => b.area).filter(Boolean))];
 
-/** ブロック格子で選んだマスに、この項目のどれかの配置が入っているか */
-function inCell(e) {
-  if (!state.cell) return true;
-  const { area, hall, block } = state.cell;
-  // マスの側と同じ正規化を通してから比べる
-  return (e.booths || []).some(b => {
-    const o = official(b);
-    return o ? o.area === area && o.hall === hall && o.block === block : false;
-  });
-}
-
 function matches(e) {
   if (state.q && !haystack(e).includes(state.q)) return false;
   if (state.mediaOnly && !(e.media && e.media.length)) return false;
@@ -625,73 +624,105 @@ function rowsFor(tab) {
 }
 
 /**
- * 収集できた配置を「地区 → ホール → ブロック」で数える。
- *
- * ホール番号を書かないツイートがとても多いが、ブロック記号が分かればホールは
- * 公式の構成から一意に決まるので、書かれていなくても正しい箱に入れられる。
+ * 配置を「地区/ホール/ブロック/番号」ごとにまとめる。
+ * ブロック記号からホールと表記を引き直すので、ツイートにホール番号が無くても、
+ * 大文字小文字が揺れていても、正しいマスに入る。
  */
-function buildBlockIndex(rows) {
-  const counts = new Map(); // "地区/ホール/ブロック" -> 件数
-  const strays = new Map(); // 公式の構成に無いブロック
+function buildSpaceIndex(rows) {
+  const spaces = new Map(); // "地区/ホール/ブロック/番号" -> 項目[]
+  const strays = new Map();
   for (const e of rows) {
     for (const b of e.booths || []) {
-      // ブロック記号の方を信じる。ツイートのホール番号は間違っていることがあり、
-      // 大文字小文字も揺れる。そのまま使うと構成表に無い箱を指してマスごと消える。
       const o = official(b);
       if (!o) {
-        if (b.block && b.area) {
-          const k = b.area + '/' + b.block;
-          strays.set(k, (strays.get(k) || 0) + 1);
-        }
+        if (b.block && b.area) strays.set(b.area + '/' + b.block, (strays.get(b.area + '/' + b.block) || 0) + 1);
         continue;
       }
-      const key = o.area + '/' + o.hall + '/' + o.block;
-      counts.set(key, (counts.get(key) || 0) + 1);
+      const key = o.area + '/' + o.hall + '/' + o.block + '/' + (b.number ?? 0);
+      if (!spaces.has(key)) spaces.set(key, []);
+      const at = spaces.get(key);
+      if (!at.some(x => x.screenName === e.screenName)) at.push(e);
     }
   }
-  return { counts, strays };
+  return { spaces, strays };
 }
 
-function cellHtml(area, hall, block, n, max) {
-  const level = n === 0 ? 0 : n >= max * 0.66 ? 3 : n >= max * 0.33 ? 2 : 1;
-  const on = state.cell && state.cell.area === area && state.cell.hall === hall && state.cell.block === block;
-  return '<button class="cell" type="button" data-area="' + esc(area) + '" data-level="' + level +
-    '" data-hall="' + esc(hall) + '" data-block="' + esc(block) + '"' +
-    (n === 0 ? ' disabled' : '') +
-    ' aria-pressed="' + (on ? 'true' : 'false') + '"><b>' + esc(block) + '</b><i>' + n + '</i></button>';
+/**
+ * 島の中でのスペースの位置。
+ * 配置図どおり、右列を下から上へ 1..N/2、左列を上から下へ N/2+1..N と蛇行させる。
+ */
+function spaceCell(num, total) {
+  const half = Math.ceil(total / 2);
+  if (num <= half) return { col: 2, row: half - num + 1 };
+  return { col: 1, row: Math.min(num - half, half) };
+}
+
+function islandHtml(area, hall, block, total, spaces) {
+  let cells = '';
+  for (let n = 1; n <= total; n++) {
+    const at = spaces.get(area + '/' + hall + '/' + block + '/' + n);
+    if (!at || !at.length) continue;
+    const { col, row } = spaceCell(n, total);
+    const names = at.map(e => e.circleName || e.displayName);
+    const mark = markOf(at[0].screenName).s;
+    cells += '<button class="sp" type="button" data-area="' + esc(area) + '"' +
+      (mark ? ' data-mark="' + mark + '"' : '') +
+      ' data-sn="' + esc(at[0].screenName) + '" style="grid-column:' + col + ';grid-row:' + row + '"' +
+      ' title="' + esc(area + hall + ' ' + block + '-' + String(n).padStart(2, '0') + '  ' + names.join(' / ')) + '">' +
+      '<span class="num">' + n + '</span><span class="nm">' + esc(names.join('/')) + '</span></button>';
+  }
+  const half = Math.ceil(total / 2);
+  return '<div class="island"><span class="blk">' + esc(block) + '</span>' +
+    '<div class="grid2" style="grid-template-rows:repeat(' + half + ',var(--sh))">' + cells + '</div></div>';
 }
 
 function renderMap(rows) {
-  const view = document.getElementById('mapview');
-  if (state.tab !== 'circles') { view.hidden = true; return; }
-  view.hidden = false;
+  const wrap = document.getElementById('mapwrap');
+  if (state.tab !== 'circles') { wrap.hidden = true; return; }
+  wrap.hidden = false;
 
-  const { counts, strays } = buildBlockIndex(rows);
-  const max = Math.max(1, ...counts.values());
+  const { spaces, strays } = buildSpaceIndex(rows);
   let html = '';
 
   for (const { area, halls } of VENUE) {
-    let inner = '';
-    for (const { hall, blocks } of halls) {
-      const cells = blocks.map(b => cellHtml(area, hall, b, counts.get(area + '/' + hall + '/' + b) || 0, max)).join('');
-      inner += '<div class="hall" data-area="' + esc(area) + '"><span class="name">' + esc(area + hall) +
-               'ホール</span><div class="cells">' + cells + '</div></div>';
+    let hallsHtml = '';
+    for (const { hall, blocks, spaces: total } of halls) {
+      // 配置図と同じ向きにする: ア/あ/a が右端に来るよう、ブロックは逆順に並べる
+      const islands = [...blocks].reverse().map(b => islandHtml(area, hall, b, total, spaces)).join('');
+      hallsHtml += '<div class="mhall" data-area="' + esc(area) + '"><span class="name">' + esc(area + hall) +
+                   'ホール</span><div class="islands">' + islands + '</div></div>';
     }
-    html += '<div class="arearow"><h3>' + esc(area) + '地区</h3><div class="halls">' + inner + '</div></div>';
+    html += '<div class="marea"><h3>' + esc(area) + '地区</h3><div class="mhalls">' + hallsHtml + '</div></div>';
   }
 
-  // 公式の構成に無いブロックは黙って捨てず、別枠で出す(解析ミスに気づけるように)
   if (strays.size) {
-    const cells = [...strays.entries()].map(([k, n]) => {
-      const [area, block] = k.split('/');
-      return cellHtml(area, '', block, n, max);
-    }).join('');
-    html += '<div class="arearow"><h3>構成表に無いブロック</h3><div class="halls">' +
-            '<div class="hall"><span class="name">要確認</span><div class="cells">' + cells + '</div></div></div></div>';
+    const list = [...strays.entries()].map(([k, n]) => esc(k.replace('/', ' ')) + ' (' + n + ')').join('  ');
+    html += '<div class="marea"><h3>構成表に無いブロック</h3><div class="note">' + list + '</div></div>';
   }
 
-  view.querySelector('.cellwrap').innerHTML = html;
-  view.querySelector('.clear').hidden = !state.cell;
+  document.getElementById('mapcanvas').innerHTML = html;
+}
+
+// --- 拡大縮小 ---
+let zoom = 1;
+function applyZoom(z) {
+  zoom = Math.min(4, Math.max(0.25, z));
+  const canvas = document.getElementById('mapcanvas');
+  canvas.style.transform = 'scale(' + zoom + ')';
+  // 縮小時は文字を出さない。読めない字を並べても意味がないし、描画も重い
+  canvas.dataset.detail = zoom < 0.7 ? '0' : zoom < 1.25 ? '1' : '2';
+  document.getElementById('zoomlabel').textContent = Math.round(zoom * 100) + '%';
+  const scroll = document.getElementById('mapscroll');
+  scroll.style.height = Math.min(780, canvas.scrollHeight * zoom + 28) + 'px';
+}
+
+/** 会場全体が横幅に収まる倍率 */
+function fitZoom() {
+  const canvas = document.getElementById('mapcanvas');
+  const scroll = document.getElementById('mapscroll');
+  canvas.style.transform = 'scale(1)';
+  const w = canvas.scrollWidth;
+  applyZoom(w ? (scroll.clientWidth - 8) / w : 1);
 }
 
 function render() {
@@ -699,7 +730,7 @@ function render() {
   // マップはマス選択以外の絞り込みを反映する —— 検索した結果の分布が見えないと索引の意味がない
   const base = all.filter(matches);
   renderMap(base);
-  const list = base.filter(inCell).sort(state.sort === 'space' ? bySpace : byNewest);
+  const list = base.sort(state.sort === 'space' ? bySpace : byNewest);
   document.getElementById('count').textContent =
     list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
 
@@ -718,7 +749,15 @@ function render() {
   const grid = document.getElementById('grid');
   const twrap = document.getElementById('ltable-wrap');
 
-  if (state.view === 'table') {
+  document.getElementById('mapwrap').hidden = state.tab !== 'circles' || state.view !== 'map';
+
+  if (state.view === 'map') {
+    grid.hidden = true;
+    twrap.hidden = false;
+    twrap.innerHTML = '<table class="ltable"><thead><tr>' +
+      '<th>状態</th><th>配置</th><th>サークル</th><th>金額</th><th>メモ</th><th></th>' +
+      '</tr></thead><tbody>' + list.slice(0, 60).map(rowHtml).join('') + '</tbody></table>';
+  } else if (state.view === 'table') {
     grid.hidden = true;
     twrap.hidden = false;
     twrap.innerHTML = '<table class="ltable"><thead><tr>' +
@@ -918,10 +957,13 @@ document.getElementById('buy-filter').addEventListener('click', ev => {
   render();
 });
 
-document.getElementById('view-toggle').addEventListener('click', ev => {
-  state.view = state.view === 'cards' ? 'table' : 'cards';
-  ev.currentTarget.textContent = state.view === 'cards' ? '表で見る' : 'カードで見る';
+document.querySelector('.viewpick').addEventListener('click', ev => {
+  const b = ev.target.closest('.chip');
+  if (!b) return;
+  state.view = b.dataset.view;
+  for (const c of document.querySelectorAll('.viewpick .chip')) c.setAttribute('aria-pressed', String(c === b));
   render();
+  if (state.view === 'map') fitZoom();
 });
 
 document.getElementById('csv-btn').addEventListener('click', () =>
@@ -1012,15 +1054,14 @@ document.getElementById('ltable-wrap').addEventListener('click', ev => {
   if (row) openPanel(row.dataset.sn);
 });
 
-document.getElementById('mapview').addEventListener('click', ev => {
-  if (ev.target.closest('.clear')) { state.cell = null; render(); return; }
-  const cell = ev.target.closest('.cell');
-  if (!cell) return;
-  const picked = { area: cell.dataset.area, hall: cell.dataset.hall, block: cell.dataset.block };
-  const same = state.cell && ['area', 'hall', 'block'].every(k => state.cell[k] === picked[k]);
-  state.cell = same ? null : picked;
-  render();
+document.getElementById('mapcanvas').addEventListener('click', ev => {
+  const sp = ev.target.closest('.sp');
+  if (sp) openPanel(sp.dataset.sn);
 });
+
+document.getElementById('zoom-in').addEventListener('click', () => applyZoom(zoom * 1.3));
+document.getElementById('zoom-out').addEventListener('click', () => applyZoom(zoom / 1.3));
+document.getElementById('zoom-fit').addEventListener('click', fitZoom);
 
 const lightbox = document.getElementById('lightbox');
 document.getElementById('grid').addEventListener('click', ev => {
@@ -1062,6 +1103,8 @@ new IntersectionObserver(entries => {
 
 initSeen([...DATA.circles, ...DATA.cosplayers, ...DATA.unclassified]);
 render();
+fitZoom();
+addEventListener('resize', () => { if (state.view === 'map') fitZoom(); });
 `;
 
 export function renderHtml(dataset: Dataset): string {
@@ -1120,7 +1163,11 @@ export function renderHtml(dataset: Dataset): string {
   </div>
 
   <div class="toolbar2">
-    <button class="chip" type="button" id="view-toggle">表で見る</button>
+    <div class="chips viewpick">
+      <button class="chip" type="button" data-view="map" aria-pressed="true">地図</button>
+      <button class="chip" type="button" data-view="cards" aria-pressed="false">カード</button>
+      <button class="chip" type="button" data-view="table" aria-pressed="false">表</button>
+    </div>
     <span class="spacer"></span>
     <button class="chip" type="button" id="csv-btn" title="今の絞り込み・並び順で書き出します">CSV</button>
     <button class="chip" type="button" id="print-btn" title="今の絞り込み・並び順で印刷します">印刷</button>
@@ -1130,15 +1177,19 @@ export function renderHtml(dataset: Dataset): string {
     <button class="chip" type="button" id="read-all-btn" title="「新着」の印をすべて消します">すべて既読にする</button>
   </div>
 
-  <section class="mapview" id="mapview" hidden>
-    <header>
-      <h2>配置マップ</h2>
-      <span class="note">採集できた配置のブロック索引です。公式の会場平面図ではありません —
-        正確な配置図は <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">コミケWebカタログ</a> で確認してください</span>
-      <button class="clear" type="button" hidden>選択を解除</button>
-    </header>
-    <div class="cellwrap"></div>
-  </section>
+  <div class="mapwrap" id="mapwrap">
+    <div class="mapbar">
+      <span class="note">公式配置図のホール構成に沿った地図です。通路や島の細かな位置までは再現していません —
+        正確な配置は <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">コミケWebカタログ</a> で確認してください</span>
+      <div class="zoom">
+        <button class="zbtn" type="button" id="zoom-out" aria-label="縮小">−</button>
+        <button class="zbtn" type="button" id="zoom-in" aria-label="拡大">＋</button>
+        <button class="zbtn wide" type="button" id="zoom-fit">全体</button>
+        <span id="zoomlabel">100%</span>
+      </div>
+    </div>
+    <div class="mapscroll" id="mapscroll"><div class="mapcanvas" id="mapcanvas" data-detail="1"></div></div>
+  </div>
 
   <div class="grid" id="grid"></div>
   <div id="more-sentinel" hidden></div>

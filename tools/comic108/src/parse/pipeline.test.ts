@@ -153,9 +153,9 @@ check(
         html.replace(/id="c108-data">[\s\S]*?<\/script>/, ''),
     ),
 );
-check('配置マップの枠がある', html.includes('id="mapview"'));
+check('地図の枠がある', html.includes('id="mapcanvas"') && html.includes('id="zoom-fit"'));
 // 公式配置図から起こしたホール構成が埋め込まれていること
-check('会場のホール構成が入っている', html.includes('"東7ホール"') || /"hall":"7"/.test(html), null);
+check('会場のホール構成が入っている', /"hall":"7"/.test(html) && /"spaces":48/.test(html));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));
 check('西は平仮名、南は英小字', /"西\/め":"1"/.test(html) && /"南\/t":"1"/.test(html));
 check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));
