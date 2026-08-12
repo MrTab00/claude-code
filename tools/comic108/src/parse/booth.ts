@@ -327,8 +327,16 @@ export function boothDays(booths: Booth[]): Day[] {
 
 /** 直接从文本里读日程标记 —— cosplayer 没有摊位号, 只能靠这个判断出场日 */
 export function parseDays(input: string): Day[] {
+    const text = normalize(input);
     const days = new Set<Day>();
-    for (const m of findDayMarkers(normalize(input))) days.add(m.day);
+    for (const m of findDayMarkers(text)) days.add(m.day);
+
+    // 「両日参加」は両方。配置の日付判定(pickDay)には入れない —— あちらは
+    // 1 つの配置に 1 つの日を選ぶので、同じ位置に 2 つ候補があると壊れる
+    if (/両日|全日程/.test(text)) {
+        days.add(1);
+        days.add(2);
+    }
     return [...days].sort();
 }
 

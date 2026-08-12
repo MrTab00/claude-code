@@ -3,7 +3,7 @@
  */
 
 import type { Circle, Confidence, Media, NormalizedTweet } from '../types';
-import { normalize, parseBooths } from './booth';
+import { boothDays, normalize, parseBooths, parseDays } from './booth';
 
 /** 各种括号包住的内容 —— 日文推文里社团名和本子名几乎都在括号里 */
 const BRACKETED = /[「『【《\[]([^」』】》\]]{1,40})[」』】》\]]/g;
@@ -90,6 +90,10 @@ export function buildCircle(tweet: NormalizedTweet, dual: boolean): Circle {
         circleName: name,
         circleNameConfidence: confidence,
         booths,
+        // 表示名の「@C108両日参加」のように、配置は無くても日程だけ分かる例が多い
+        days: [
+            ...new Set([...boothDays(booths), ...parseDays(tweet.text), ...parseDays(tweet.displayName)]),
+        ].sort(),
         works,
         hasShinagaki: SHINAGAKI.test(text) && tweet.media.length > 0,
         price: price ? `${price[1]}円` : null,

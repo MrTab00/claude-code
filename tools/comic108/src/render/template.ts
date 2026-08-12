@@ -218,7 +218,7 @@ const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]))
 
 const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
-const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false };
+const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false, grouped: true };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const thumb = m => m.dataUri || (m.url.includes('pbs.twimg.com') ? m.url + '?name=small' : m.url);
@@ -234,7 +234,51 @@ function haystack(e) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
-const entryDays  = e => e.days || [...new Set((e.booths || []).map(b => b.day).filter(Boolean))];
+const entryDays  = e => (e.days && e.days.length ? e.days : [...new Set((e.booths || []).map(b => b.day).filter(Boolean))]);
+
+const uniq = xs => [...new Set(xs)];
+
+/** どの配置がより信頼できるか。本文由来 > 表示名/プロフ由来 > 部分的 > 別ツイートからの借り物 */
+function boothScore(e) {
+  const b = (e.booths || [])[0];
+  if (!b) return 0;
+  if (b.source === 'account') return 1;
+  if (b.confidence !== 'high') return 2;
+  return b.source ? 3 : 4;
+}
+
+/**
+ * 同じアカウントの投稿を 1 枚にまとめる。
+ * 1 サークルがお品書きを何度も投稿するのは普通なので、ツイート単位のままだと
+ * 数百件規模で同じサークルが画面を埋めてしまう。探すのはサークルであってツイートではない。
+ */
+function groupByAccount(list) {
+  const map = new Map();
+  for (const e of list) {
+    const prev = map.get(e.screenName);
+    if (!prev) { map.set(e.screenName, { ...e, posts: 1 }); continue; }
+
+    const better = boothScore(e) > boothScore(prev);
+    const base = better ? e : prev;
+    const seen = new Set();
+    const media = [...(prev.media || []), ...(e.media || [])].filter(m => !seen.has(m.url) && seen.add(m.url));
+
+    map.set(e.screenName, {
+      ...base,
+      posts: prev.posts + 1,
+      media: media.slice(0, 12),
+      works: uniq([...(prev.works || []), ...(e.works || [])]),
+      characters: uniq([...(prev.characters || []), ...(e.characters || [])]),
+      series: uniq([...(prev.series || []), ...(e.series || [])]),
+      locations: uniq([...(prev.locations || []), ...(e.locations || [])]),
+      days: uniq([...entryDays(prev), ...entryDays(e)]).sort(),
+      price: prev.price || e.price,
+      hasShinagaki: prev.hasShinagaki || e.hasShinagaki,
+      createdAt: prev.createdAt > e.createdAt ? prev.createdAt : e.createdAt,
+    });
+  }
+  return [...map.values()];
+}
 const entryAreas = e => [...new Set((e.booths || []).map(b => b.area).filter(Boolean))];
 
 function matches(e) {
@@ -296,6 +340,7 @@ function footHtml(e) {
   if (e.price) bits.push(esc(e.price));
   if (e.hasShinagaki) bits.push('お品書きあり');
   if (e.dual) bits.push('サークル兼レイヤー');
+  if (e.posts > 1) bits.push(esc(e.posts) + ' 投稿をまとめて表示');
 
   let html = '<div class="foot">' + (bits.length ? '<span>' + bits.join(' · ') + '</span>' : '');
   if (e.charactersConfidence === 'low' && (e.characters || []).length)
@@ -315,8 +360,10 @@ function cardHtml(e) {
 }
 
 function render() {
-  const list = DATA[state.tab].filter(matches);
-  document.getElementById('count').textContent = list.length + ' / ' + DATA[state.tab].length + ' 件';
+  const all = state.grouped ? groupByAccount(DATA[state.tab]) : DATA[state.tab];
+  const list = all.filter(matches);
+  document.getElementById('count').textContent =
+    list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
   document.getElementById('area-filter').hidden = state.tab !== 'circles';
 
   const grid = document.getElementById('grid');
@@ -357,6 +404,12 @@ document.getElementById('q').addEventListener('input', ev => {
 
 bindToggle(document.getElementById('day-filter'), state.days, true);
 bindToggle(document.getElementById('area-filter'), state.areas, false);
+
+document.getElementById('group-toggle').addEventListener('click', ev => {
+  state.grouped = !state.grouped;
+  ev.currentTarget.setAttribute('aria-pressed', String(state.grouped));
+  render();
+});
 
 document.getElementById('media-only').addEventListener('click', ev => {
   state.mediaOnly = !state.mediaOnly;
@@ -425,7 +478,10 @@ export function renderHtml(dataset: Dataset): string {
       <button class="chip" type="button" data-value="西" aria-pressed="false">西</button>
       <button class="chip" type="button" data-value="南" aria-pressed="false">南</button>
     </div>
-    <div class="chips"><button class="chip" type="button" id="media-only" aria-pressed="false">画像あり</button></div>
+    <div class="chips">
+      <button class="chip" type="button" id="group-toggle" aria-pressed="true">サークル単位</button>
+      <button class="chip" type="button" id="media-only" aria-pressed="false">画像あり</button>
+    </div>
     <span class="count" id="count"></span>
   </div>
 

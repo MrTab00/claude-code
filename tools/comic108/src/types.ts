@@ -84,6 +84,8 @@ export interface Circle {
     circleName: string | null;
     circleNameConfidence: Confidence;
     booths: Booth[];
+    /** 出展日。配置から取れた日に加え、本文や表示名の「両日参加」なども反映する */
+    days: Day[];
     /** 新刊/既刊 标题候选 */
     works: string[];
     /** 是否包含お品書き图 */
