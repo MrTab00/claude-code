@@ -94,6 +94,16 @@ try {
             `\n  -> ${paths.raw}\n`,
     );
 
+    // レート制限で終わった検索は、その期間を採り終えていない
+    const cutShort = results.filter((r) => r.rateLimited).length;
+    if (cutShort) {
+        console.log(
+            `${cutShort} 回の検索がレート制限で切れています。X の検索は 15 分ごとの回数制限があり、\n` +
+                'そこに当たると結果が返らなくなります(枯れたわけではありません)。\n' +
+                '15 分ほど置いてから、同じ期間を --from= / --to= で指定して引き直してください。\n',
+        );
+    }
+
     // 上限で打ち切られたまま終わった検索が残っているなら、まだ奥がある
     const stillCapped = results.filter((r) => r.hitCap).length;
     if (stillCapped) {
@@ -109,7 +119,7 @@ try {
         console.log('応答が 0 件だったキーワード:');
         for (const r of empty) {
             const why = r.httpErrors
-                ? `HTTP ${r.lastErrorStatus ?? 'エラー'} が ${r.httpErrors} 件 —— レート制限の可能性`
+                ? `HTTP ${r.lastErrorStatus ?? 'エラー'} が ${r.httpErrors} 件 —— ${r.lastErrorStatus === 429 ? 'レート制限(15 分待てば回復)' : 'サーバ側のエラー'}`
                 : '該当するツイートが無かった可能性が高い';
             console.log(`  - ${r.query}: ${why}`);
         }

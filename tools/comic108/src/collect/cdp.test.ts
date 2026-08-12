@@ -58,6 +58,17 @@ if (!chromePath) {
     check('上限まで採れたら hitCap', (await autoScroll(bottom, full, { maxTweets: 3, delay: () => 0 })).hitCap === true);
     check('尽きたときは hitCap を立てない',
         (await autoScroll(bottom, empty, { maxTweets: 999, delay: () => 0 })).hitCap === false);
+
+    // レート制限で切れた期間を「尽きた」と扱うと、その期間だけ穴が空いたまま完了になる。
+    // 判断材料は「新しいツイートが来なくなった間に 429 が増えたか」
+    let hits = 0;
+    const limited = { seenTweets: new Set<string>(), get rateLimitHits() { return ++hits; } } as never;
+    const r = await autoScroll(bottom, limited, { maxTweets: 999, delay: () => 0 });
+    check('止まった間に 429 が増えていればレート制限と見なす', r.rateLimited === true && r.hitCap === false, r);
+
+    const quiet = { seenTweets: new Set<string>(), rateLimitHits: 7 } as never;
+    const r2 = await autoScroll(bottom, quiet, { maxTweets: 999, delay: () => 0 });
+    check('前に見た 429 が残っているだけなら尽きたと見なす', r2.rateLimited === false, r2);
 }
 
 // --- 期間で区切って掘るときの窓の計算(ブラウザ不要) ---
@@ -250,6 +261,17 @@ try {
     check('上限まで採れたら hitCap', (await autoScroll(bottom, full, { maxTweets: 3, delay: () => 0 })).hitCap === true);
     check('尽きたときは hitCap を立てない',
         (await autoScroll(bottom, empty, { maxTweets: 999, delay: () => 0 })).hitCap === false);
+
+    // レート制限で切れた期間を「尽きた」と扱うと、その期間だけ穴が空いたまま完了になる。
+    // 判断材料は「新しいツイートが来なくなった間に 429 が増えたか」
+    let hits = 0;
+    const limited = { seenTweets: new Set<string>(), get rateLimitHits() { return ++hits; } } as never;
+    const r = await autoScroll(bottom, limited, { maxTweets: 999, delay: () => 0 });
+    check('止まった間に 429 が増えていればレート制限と見なす', r.rateLimited === true && r.hitCap === false, r);
+
+    const quiet = { seenTweets: new Set<string>(), rateLimitHits: 7 } as never;
+    const r2 = await autoScroll(bottom, quiet, { maxTweets: 999, delay: () => 0 });
+    check('前に見た 429 が残っているだけなら尽きたと見なす', r2.rateLimited === false, r2);
 }
 
 // --- 期間で区切って掘るときの窓の計算(ブラウザ不要) ---
