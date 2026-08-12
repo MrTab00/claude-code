@@ -35,24 +35,49 @@ try {
     const results = await collectAll(queries, { autoLaunch, maxTweets });
     const tweets = results.reduce((n, r) => n + r.tweets, 0);
     const captures = results.reduce((n, r) => n + r.captures, 0);
+    const httpErrors = results.reduce((n, r) => n + r.httpErrors, 0);
+    const rateLimited = results.some((r) => r.lastErrorStatus === 429);
 
     console.log(`\n採集完了: 応答 ${captures} 件 / 述べツイート ${tweets} 件\n  -> ${paths.raw}\n`);
 
-    if (captures === 0) {
-        // 黙って 0 件で終わるのが一番たちが悪いので、原因の候補を出す
+    // 何も採れなかったキーワードは、理由まで書かないと調べようがない
+    const empty = results.filter((r) => r.captures === 0);
+    if (empty.length) {
+        console.log('応答が 0 件だったキーワード:');
+        for (const r of empty) {
+            const why = r.httpErrors
+                ? `HTTP ${r.lastErrorStatus ?? 'エラー'} が ${r.httpErrors} 件 —— レート制限の可能性`
+                : '該当するツイートが無かった可能性が高い';
+            console.log(`  - ${r.query}: ${why}`);
+        }
+        console.log('');
+    }
+
+    if (rateLimited) {
+        console.log(
+            [
+                'レート制限(429)を受けています。しばらく置いてから、',
+                '残りのキーワードだけを指定して再実行してください:',
+                '  bun run collect "#C108 コスプレ"',
+                'data/raw は積み上がるので、あとから足しても parse がまとめて扱います。',
+                '',
+            ].join('\n'),
+        );
+    } else if (captures === 0) {
         console.log(
             [
                 '応答を 1 件も捕獲できませんでした。考えられる原因:',
                 '  - X にログインできていない (検索結果が表示されない)',
                 '  - キーワードに該当するツイートが無い',
                 '  - X 側の GraphQL operation 名が変わった',
-                `    その場合は config.ts の collect.operations を見直してください。`,
+                '    その場合は config.ts の collect.operations を見直してください。',
                 '',
             ].join('\n'),
         );
-    } else {
-        console.log('次: bun run parse\n');
     }
+
+    if (captures > 0) console.log('次: bun run parse\n');
+    if (httpErrors && !rateLimited) console.log(`※ HTTP エラー ${httpErrors} 件を無視しました\n`);
 } catch (err) {
     console.error(`\n${(err as Error).message}\n`);
     process.exit(1);

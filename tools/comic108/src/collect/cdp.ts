@@ -43,6 +43,12 @@ export function matchOperation(url: string): string | null {
 export interface Capture {
     readonly seenTweets: Set<string>;
     readonly captures: number;
+    /** HTTP エラーで返ってきた対象応答の数(429 のレート制限など) */
+    readonly httpErrors: number;
+    /** 本体が読めなかった対象応答の数 */
+    readonly unreadable: number;
+    /** 直近に見た HTTP エラーのステータス */
+    readonly lastErrorStatus: number | null;
     detach(): Promise<void>;
 }
 
@@ -55,11 +61,31 @@ export function attachCapture(conn: CdpConnection, page: CdpPage, file: string, 
     const watching = new Map<string, string>(); // requestId -> url
     let captures = 0;
     let pending = 0;
+    let httpErrors = 0;
+    let unreadable = 0;
+    let lastErrorStatus: number | null = null;
 
     const offResponse = conn.on('Network.responseReceived', (params, sid) => {
         if (sid !== page.sessionId) return;
-        const url = String((params.response as { url?: string })?.url ?? '');
-        if (matchOperation(url)) watching.set(String(params.requestId), url);
+        const response = (params.response ?? {}) as { url?: string; status?: number };
+        const url = String(response.url ?? '');
+        if (!matchOperation(url)) return;
+
+        // 対象の operation がエラーで返ってきたことは記録しておく。
+        // 黙って捨てると「0 件」の理由がレート制限なのか本当に無いのか分からなくなる
+        const status = Number(response.status ?? 0);
+        if (status >= 400) {
+            httpErrors++;
+            lastErrorStatus = status;
+            return;
+        }
+        watching.set(String(params.requestId), url);
+    });
+
+    // リクエスト自体が失敗した場合(中断・ネットワークエラー)も数える
+    const offFailed = conn.on('Network.loadingFailed', (params, sid) => {
+        if (sid !== page.sessionId) return;
+        if (watching.delete(String(params.requestId))) unreadable++;
     });
 
     // 応答本体は loadingFinished を待たないと取れない
@@ -87,7 +113,8 @@ export function attachCapture(conn: CdpConnection, page: CdpPage, file: string, 
                 captures++;
                 for (const id of collectTweetNodes(body).keys()) seenTweets.add(id);
             } catch {
-                // JSON でない / 既に破棄された応答は黙って捨てる
+                // JSON でない / 既に破棄された応答
+                unreadable++;
             } finally {
                 pending--;
             }
@@ -99,10 +126,20 @@ export function attachCapture(conn: CdpConnection, page: CdpPage, file: string, 
         get captures() {
             return captures;
         },
+        get httpErrors() {
+            return httpErrors;
+        },
+        get unreadable() {
+            return unreadable;
+        },
+        get lastErrorStatus() {
+            return lastErrorStatus;
+        },
         async detach() {
             // 走査中の書き込みを取りこぼさないよう、落ち着くまで待つ
             for (let i = 0; i < 100 && pending > 0; i++) await sleep(100);
             offResponse();
+            offFailed();
             offFinished();
         },
     };
@@ -233,6 +270,9 @@ export interface CollectResult {
     captures: number;
     tweets: number;
     file: string;
+    httpErrors: number;
+    unreadable: number;
+    lastErrorStatus: number | null;
 }
 
 async function collectQuery(
@@ -262,9 +302,22 @@ async function collectQuery(
     }
 
     await capture.detach();
-    process.stdout.write(`\r    ${query} — ${capture.seenTweets.size} 件 (応答 ${capture.captures} 件)\n`);
 
-    return { query, captures: capture.captures, tweets: capture.seenTweets.size, file };
+    const trouble =
+        capture.httpErrors || capture.unreadable
+            ? ` ⚠ HTTP エラー ${capture.httpErrors} 件${capture.lastErrorStatus ? `(直近 ${capture.lastErrorStatus})` : ''} / 読めず ${capture.unreadable} 件`
+            : '';
+    process.stdout.write(`\r    ${query} — ${capture.seenTweets.size} 件 (応答 ${capture.captures} 件)${trouble}\n`);
+
+    return {
+        query,
+        captures: capture.captures,
+        tweets: capture.seenTweets.size,
+        file,
+        httpErrors: capture.httpErrors,
+        unreadable: capture.unreadable,
+        lastErrorStatus: capture.lastErrorStatus,
+    };
 }
 
 export interface CollectOptions {

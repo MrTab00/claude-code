@@ -70,6 +70,8 @@ const server = Bun.serve({
             pageRequests++;
             return Response.json(fixture);
         }
+        // レート制限された対象 operation。黙って捨てず、数えられなければならない
+        if (pathname.endsWith('/UserTweets')) return new Response('Rate limit exceeded', { status: 429 });
         // 監視対象外の operation —— 捕獲されてはいけない
         if (pathname.endsWith('/AudioSpaceById')) return Response.json({ data: { ignored: true } });
         // GraphQL ではない API —— 捕獲されてはいけない
@@ -86,6 +88,7 @@ const server = Bun.serve({
                let loading = false, pages = 0;
                const hit = () => {
                  fetch('/i/api/graphql/AbC123hash/SearchTimeline?variables=%7B%7D');
+                 fetch('/i/api/graphql/Rate999hash/UserTweets').catch(() => {});
                  fetch('/i/api/graphql/XyZ789hash/AudioSpaceById');
                  fetch('/i/api/2/notifications/all.json');
                };
@@ -167,6 +170,11 @@ try {
     check('GraphQL 以外は捕獲していない', !rows.some((r) => r.url.includes('/i/api/2/')));
     check('query が記録されている', rows.every((r) => r.query === 'テストクエリ'));
     check('応答本体がそのまま保存されている', !!(rows[0]?.body as { data?: unknown })?.data);
+
+    // 「0 件」の理由がレート制限なのか、本当に該当が無いのかを区別できること
+    check('HTTP エラーを数えている', capture.httpErrors > 0, capture.httpErrors);
+    check('直近のステータスが 429', capture.lastErrorStatus === 429, capture.lastErrorStatus);
+    check('エラー応答は jsonl に混ざらない', !rows.some((r) => r.op === 'UserTweets'), rows.map((r) => r.op));
 
     await page.close();
     conn.close();
