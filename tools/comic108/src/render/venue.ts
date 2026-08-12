@@ -1,15 +1,16 @@
 /**
  * C108 の会場レイアウト。公式配置図 (C108Map_all_B4.pdf) をそのまま写したもの。
  *
- * ブロックを等間隔に並べただけでは会場と違う形になってしまう。実際は
- *   - ホールとホールの間に大きな空きがある
- *   - ホールの中も通路でいくつかのまとまりに分かれている
- *   - 島は通路で横にも切られていて、その段数はブロックごとに違う
- *     (端の島ほど短い。東3 の ヨ は 54 スペース、隣の ユ は 66 スペース)
- *   - ブロック記号は島の途中、通路の切れ目に入る
- *   - 端には壁サークルが 1 列で縦に並ぶ
- *   - 東7 と西は上下 2 段になっている
- * ので、その形をそのまま持つ。並びは配置図と同じ左→右。
+ * 会場を真上から見た並びをそのまま持つ:
+ *   東1・2・3 が 1 棟(上段)、その下に 東7 と 西 が横に並び、いちばん下が 南。
+ * 棟の中は
+ *   - ホールの仕切り
+ *   - 通路で分かれた島のまとまり
+ *   - 島を横に切る通路(bands)。段数はブロックごとに違い、端の島ほど短い
+ *     (東3 の ヨ は 54 スペース、隣の ユ は 66 スペース)
+ *   - ブロック記号が入る段(letterAfter)
+ *   - 外周をまわる壁サークル
+ * まで写してある。並びは配置図と同じ左→右。
  *
  * 通路の幅までは持っていない。あくまで「どのブロックのどこか」を会場なりの形で
  * 見せるためのもので、現地の順路は公式配置図で確認すること。
@@ -35,7 +36,7 @@ export interface Section {
     groups: Island[][];
 }
 
-/** 壁サークル。ホールの端に 1 列で縦に並ぶ */
+/** 壁サークル。棟の外周をまわるが、地図ではホールの端に 1 本にまとめる */
 export interface Wall {
     block: string;
     spaces: number;
@@ -49,21 +50,18 @@ export interface Hall {
     wall?: Wall;
 }
 
-/** ホールの横並び 1 列ぶん */
-export interface HallRow {
+/** 1 棟。中の仕切りがホール。地図の絞り込みもこの単位 */
+export interface Building {
+    /** 絞り込みの鍵。チップの文字にもなる */
+    id: string;
+    area: Area;
     /** 左→右の並び */
     halls: Hall[];
-    /**
-     * 1 棟として 1 つの枠で囲むかどうか。
-     * 西1 と西2 は間仕切りがあるだけの地続きの建物なので、まとめて 1 枠にする。
-     */
-    joined?: boolean;
 }
 
-export interface AreaLayout {
-    area: Area;
-    /** ホールの並び。段が分かれている地区があるので列ごとに持つ */
-    rows: HallRow[];
+/** 棟の横並び 1 段。会場を真上から見たときの並びそのもの */
+export interface FloorRow {
+    buildings: Building[];
 }
 
 /** 同じ形の島がいくつも続くので、まとめて作る */
@@ -89,138 +87,128 @@ const S46 = [7, 7, 9];
 const S44 = [6, 7, 9];
 const S42 = [5, 7, 9];
 
-export const VENUE: AreaLayout[] = [
+const east3: Hall = {
+    hall: '3',
+    sections: [
+        {
+            letterAfter: 1,
+            groups: [
+                [...isles('ヨ', E54), ...isles('ユヤ', E66), ...isles('モ', E62)],
+                [...isles('メ', E62), ...isles('ムミマホヘ', E66), ...isles('フ', E62), ...isles('ヒ', E48)],
+            ],
+        },
+    ],
+};
+
+const east2: Hall = {
+    hall: '2',
+    sections: [
+        {
+            letterAfter: 1,
+            groups: [
+                [...isles('ハ', E48), ...isles('ノ', E62), ...isles('ネヌ', E66), ...isles('ニ', E62)],
+                [...isles('ナ', E62), ...isles('トテツチタ', E66), ...isles('ソ', E62), ...isles('セ', E48)],
+            ],
+        },
+    ],
+};
+
+const east1: Hall = {
+    hall: '1',
+    sections: [
+        {
+            letterAfter: 1,
+            groups: [
+                [...isles('ス', E48)],
+                [...isles('シ', E62), ...isles('サコ', E66), ...isles('ケ', E62)],
+                [...isles('ク', E62), ...isles('キカオエウ', E66), ...isles('イ', E54)],
+            ],
+        },
+    ],
+    // ア は東1〜3 の外周を三方から囲む。折り返しは描けないので東1 の右端にまとめる
+    wall: { block: 'ア', spaces: 95, side: 'right' },
+};
+
+const east7: Hall = {
+    hall: '7',
+    sections: [
+        { letterAfter: 0, groups: [isles('MLKJ', E7), isles('IHG', E7), isles('FEDCB', E7)] },
+        // N・O は 2 日目には無い
+        { letterAfter: 0, groups: [isles('WVUT', E7), isles('SRQ', E7S), isles('PON', E7P)] },
+    ],
+    wall: { block: 'A', spaces: 48, side: 'left' },
+};
+
+const west1: Hall = {
+    hall: '1',
+    sections: [
+        {
+            letterAfter: 0,
+            groups: [
+                [...isles('ふひはのね', W52), ...isles('ぬに', W26), ...isles('なと', W28)],
+                [...isles('てつ', W28)],
+            ],
+        },
+        { letterAfter: 2, groups: [isles('むみまほへ', W52L)] },
+    ],
+    wall: { block: 'め', spaces: 73, side: 'left' },
+};
+
+const west2: Hall = {
+    hall: '2',
+    sections: [
+        {
+            letterAfter: 0,
+            groups: [
+                [...isles('ちた', W28)],
+                [...isles('そせ', W28), ...isles('すし', W26), ...isles('さこけくき', W52)],
+            ],
+        },
+        { letterAfter: 2, align: 'right', groups: [isles('かおえうい', W52L)] },
+    ],
+    wall: { block: 'あ', spaces: 73, side: 'right' },
+};
+
+const south1: Hall = {
+    hall: '1',
+    sections: [
+        {
+            letterAfter: 1,
+            groups: [
+                isles('tsr', S44),
+                isles('qpo', S44),
+                isles('nmlk', S46),
+                [...isles('j', S46), ...isles('ih', S44)],
+            ],
+        },
+    ],
+};
+
+const south2: Hall = {
+    hall: '2',
+    sections: [{ letterAfter: 1, groups: [[...isles('gfe', S42), ...isles('dcb', S46)]] }],
+    wall: { block: 'a', spaces: 54, side: 'right' },
+};
+
+/**
+ * 棟の並び。東1・2・3 が上段いっぱい、その下に 東7 と 西 が横並び、いちばん下が 南。
+ * 東1〜3 / 西1・2 / 南1・2 はそれぞれ地続きの 1 棟で、中の仕切りがホール。
+ */
+export const FLOOR: FloorRow[] = [
+    { buildings: [{ id: '東123', area: '東', halls: [east3, east2, east1] }] },
     {
-        area: '東',
-        rows: [
-            { halls: [
-                {
-                    hall: '3',
-                    sections: [
-                        {
-                            letterAfter: 1,
-                            groups: [
-                                [...isles('ヨ', E54), ...isles('ユヤ', E66), ...isles('モ', E62)],
-                                [...isles('メ', E62), ...isles('ムミマホヘ', E66), ...isles('フ', E62), ...isles('ヒ', E48)],
-                            ],
-                        },
-                    ],
-                },
-                {
-                    hall: '2',
-                    sections: [
-                        {
-                            letterAfter: 1,
-                            groups: [
-                                [...isles('ハ', E48), ...isles('ノ', E62), ...isles('ネヌ', E66), ...isles('ニ', E62)],
-                                [...isles('ナ', E62), ...isles('トテツチタ', E66), ...isles('ソ', E62), ...isles('セ', E48)],
-                            ],
-                        },
-                    ],
-                },
-                {
-                    hall: '1',
-                    sections: [
-                        {
-                            letterAfter: 1,
-                            groups: [
-                                [...isles('ス', E48)],
-                                [...isles('シ', E62), ...isles('サコ', E66), ...isles('ケ', E62)],
-                                [...isles('ク', E62), ...isles('キカオエウ', E66), ...isles('イ', E54)],
-                            ],
-                        },
-                    ],
-                    // 壁サークルは会場の外周をぐるりと回る(ア は東1〜3 の三方を囲む)。
-                    // 折り返しまでは描けないので、そのホールの端に 1 本にまとめて置く
-                    wall: { block: 'ア', spaces: 95, side: 'right' },
-                },
-            ] },
-            { halls: [
-                {
-                    hall: '7',
-                    sections: [
-                        {
-                            letterAfter: 0,
-                            groups: [isles('MLKJ', E7), isles('IHG', E7), isles('FEDCB', E7)],
-                        },
-                        {
-                            letterAfter: 0,
-                            // N・O は 2 日目には無い
-                            groups: [isles('WVUT', E7), isles('SRQ', E7S), isles('PON', E7P)],
-                        },
-                    ],
-                    wall: { block: 'A', spaces: 48, side: 'left' },
-                },
-            ] },
+        buildings: [
+            { id: '東7', area: '東', halls: [east7] },
+            { id: '西', area: '西', halls: [west1, west2] },
         ],
     },
-    {
-        area: '西',
-        rows: [
-            { halls: [
-                {
-                    hall: '1',
-                    sections: [
-                        {
-                            letterAfter: 0,
-                            groups: [
-                                [...isles('ふひはのね', W52), ...isles('ぬに', W26), ...isles('なと', W28)],
-                                [...isles('てつ', W28)],
-                            ],
-                        },
-                        { letterAfter: 2, groups: [isles('むみまほへ', W52L)] },
-                    ],
-                    wall: { block: 'め', spaces: 73, side: 'left' },
-                },
-                {
-                    hall: '2',
-                    sections: [
-                        {
-                            letterAfter: 0,
-                            groups: [
-                                [...isles('ちた', W28)],
-                                [...isles('そせ', W28), ...isles('すし', W26), ...isles('さこけくき', W52)],
-                            ],
-                        },
-                        { letterAfter: 2, align: 'right', groups: [isles('かおえうい', W52L)] },
-                    ],
-                    wall: { block: 'あ', spaces: 73, side: 'right' },
-                },
-            ], joined: true },
-        ],
-    },
-    {
-        area: '南',
-        rows: [
-            { halls: [
-                {
-                    hall: '1',
-                    sections: [
-                        {
-                            letterAfter: 1,
-                            groups: [
-                                isles('tsr', S44),
-                                isles('qpo', S44),
-                                isles('nmlk', S46),
-                                [...isles('j', S46), ...isles('ih', S44)],
-                            ],
-                        },
-                    ],
-                },
-                {
-                    hall: '2',
-                    sections: [
-                        {
-                            letterAfter: 1,
-                            groups: [[...isles('gfe', S42), ...isles('dcb', S46)]],
-                        },
-                    ],
-                    wall: { block: 'a', spaces: 54, side: 'right' },
-                },
-            ] },
-        ],
-    },
+    { buildings: [{ id: '南', area: '南', halls: [south1, south2] }] },
 ];
+
+/** 地図の絞り込みチップに出す棟の並び */
+export function buildingIds(): string[] {
+    return FLOOR.flatMap((row) => row.buildings.map((b) => b.id));
+}
 
 /** その島のスペース数。配置図の島の最下段が「N｜1」になっている、その N */
 export function islandSpaces(island: Island): number {
@@ -256,9 +244,9 @@ export function hallBlocks(hall: Hall): string[] {
     return hall.wall ? [...inner, hall.wall.block] : inner;
 }
 
-/** 地区とホールを平らに辿る */
+/** 棟とホールを平らに辿る */
 export function eachHall(): { area: Area; hall: Hall }[] {
-    return VENUE.flatMap(({ area, rows }) => rows.flatMap((row) => row.halls.map((hall) => ({ area, hall }))));
+    return FLOOR.flatMap((row) => row.buildings.flatMap((b) => b.halls.map((hall) => ({ area: b.area, hall }))));
 }
 
 /**

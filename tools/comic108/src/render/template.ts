@@ -7,7 +7,7 @@
  */
 
 import type { Dataset } from '../types';
-import { VENUE, buildBlockLookup, buildHallLookup } from './venue';
+import { FLOOR, buildBlockLookup, buildHallLookup, buildingIds } from './venue';
 
 /** JSON 内嵌进 <script> 时必须把 < 转义掉, 否则 "</script>" 会提前闭合标签 */
 function embedJson(data: unknown): string {
@@ -39,6 +39,8 @@ const DARK_TOKENS = `
   --south-soft: #382718;
   --flag: #e0a35c;
   --flag-soft: #322612;
+  --sheet: #1a1719;
+  --island: #322b2f;
   --shadow: none;
   --ring: rgba(229,138,168,.45);
 `;
@@ -63,6 +65,8 @@ const CSS = `
   --south-soft: #f8ece1;
   --flag: #96590d;
   --flag-soft: #fbf0dd;
+  --sheet: #f3efec;
+  --island: #ded7d2;
   --shadow: 0 1px 2px rgba(31,27,28,.05), 0 2px 8px rgba(31,27,28,.04);
   --ring: rgba(138,51,85,.35);
 
@@ -150,6 +154,8 @@ body {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   padding: 8px 0 10px;
 }
+/* 棟の絞り込み。会場でも「東は東、西は西」でしか動かないので、地図もその単位で切る */
+.bldgbar { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 0 2px; }
 .mapbar .note { font-size: 11.5px; color: var(--muted); flex: 1 1 240px; min-width: 0; }
 .mapbar .note a { color: var(--accent); }
 .mapbar .zoom { display: flex; gap: 6px; align-items: center; }
@@ -161,52 +167,47 @@ body {
 }
 .zbtn.wide { padding: 0 14px; font-size: 13px; }
 .mapscroll {
-  overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  overflow: auto; background: var(--sheet); border: 1px solid var(--border); border-radius: 12px;
   -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; overscroll-behavior: contain;
-  flex: 1; min-height: 340px;
+  /* 実際の高さは sizeMapScroll() が画面の残りぶんに合わせる */
+  flex: 1; min-height: 300px;
 }
 /*
  * transform: scale() は要素が占める領域を変えないので、canvas をそのままスクロール領域に
  * 置くと縮小しても元の大きさぶんスクロールできてしまい、下や右に大きな空白が出る。
  * 外側の sizer に「実寸 × 倍率」を持たせて、スクロール範囲を見た目に合わせる。
  */
-.mapsizer { position: relative; }
+/* 縮小して余白が出たときは中央に置く。左に寄っていると会場が端に貼りついて見える */
+.mapsizer { position: relative; margin: 0 auto; }
+/* 会場の見取り図 1 枚ぶん。棟を真上から見た並びのまま置く */
 .mapcanvas {
   --sw: 26px; --sh: 8px;
   position: absolute; top: 0; left: 0;
-  transform-origin: 0 0; padding: 18px; width: max-content;
+  transform-origin: 0 0; padding: 22px; width: max-content;
   display: flex; flex-direction: column; gap: 34px;
+  background: var(--sheet);
 }
+/* 棟が横に並ぶ段。東7 と西は隣り合っている */
+.frow { display: flex; gap: 40px; align-items: flex-start; }
 
 /*
- * 会場の外枠と、その中のホールの枠。
- * 島だけを浮かべると「どこからどこまでが 1 つの建物か」が読めないので、
- * 配置図と同じように地区を太い外枠で囲み、中のホールを細い枠で仕切る。
+ * 1 棟。東1〜3 / 西1・2 / 南1・2 はそれぞれ地続きの建物なので枠はひとつ。
+ * 中のホールの仕切りは破線で見せる。
  */
-.marea {
-  display: flex; flex-direction: column; gap: 12px;
-  border: 3px solid var(--ink); border-radius: 6px; padding: 12px 14px 16px; background: var(--surface);
+.bldg {
+  border: 2px solid var(--ink); border-radius: 4px; padding: 10px 12px 12px; background: var(--surface);
 }
-.marea > h3 { margin: 0; font: 700 13px var(--sans); color: var(--muted); letter-spacing: .04em; }
-.marea[data-area="東"] { border-color: var(--east); }
-.marea[data-area="西"] { border-color: var(--west); }
-.marea[data-area="南"] { border-color: var(--south); }
-/* ホール列。ホール同士は大きく空ける —— 会場でも間が空いている */
-.mhallrow { display: flex; gap: 46px; align-items: flex-start; }
-.mhallrows { display: flex; flex-direction: column; gap: 30px; }
-.mhall {
-  display: flex; flex-direction: column; gap: 6px;
-  border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 10px 10px; background: var(--surface-2);
-}
-/*
- * 地続きの棟。西1・西2 は別々の建物ではなく、1 つの建物を仕切ってあるだけ。
- * 枠をひとつにして、中の仕切りは破線で見せる。
- */
-.mhallrow.joined {
-  gap: 0; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface-2);
-}
-.mhallrow.joined > .mhall { border: 0; border-radius: 0; background: none; }
-.mhallrow.joined > .mhall + .mhall { border-left: 1.5px dashed var(--border); }
+.bldg[data-area="東"] { border-color: var(--east); }
+.bldg[data-area="西"] { border-color: var(--west); }
+.bldg[data-area="南"] { border-color: var(--south); }
+.bldg.stray { border-color: var(--border); border-style: dashed; }
+.bldg.stray > h4 { margin: 0 0 6px; font: 700 12px var(--sans); color: var(--muted); }
+.bhalls { display: flex; }
+.bhalls > .mhall + .mhall { border-left: 1.5px dashed var(--border); }
+
+.mhall { display: flex; flex-direction: column; gap: 6px; padding: 0 12px; }
+.bhalls > .mhall:first-child { padding-left: 0; }
+.bhalls > .mhall:last-child { padding-right: 0; }
 .mhall > .name { font: 700 12px var(--mono); color: var(--muted); }
 .mhall[data-area="東"] > .name { color: var(--east); }
 .mhall[data-area="西"] > .name { color: var(--west); }
@@ -253,7 +254,10 @@ body {
 
 /* 縮小時は文字を出さない。読めない字を並べても意味がなく、描画も重い */
 .mapcanvas[data-detail="0"] .sp { font-size: 0; padding: 0; }
-.mapcanvas[data-detail="0"] .grid2 { background-image: none; }
+/* マス目も消して島を塗りつぶす。この縮尺では 1 本の帯として見えたほうが会場の形が分かる。
+   ブロック記号だけは残す —— 縮小して全体を見るときに位置を掴む手がかりがこれしかない */
+.mapcanvas[data-detail="0"] .grid2 { background-image: none; background: var(--island); border-color: var(--island); }
+.mapcanvas[data-detail="0"] .blk { font-size: 9px; }
 .mapcanvas[data-detail="1"] .sp .nm { display: none; }
 .mapcanvas[data-detail="1"] .sp { font-size: 6.5px; }
 
@@ -445,7 +449,7 @@ const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]))
 const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
 // 公式配置図から起こしたホール構成と、ブロック→ホールの逆引き
-const VENUE = __VENUE__;
+const FLOOR = __FLOOR__;
 const HALL_OF = __HALL_OF__;
 const BLOCK_OF = __BLOCK_OF__;
 
@@ -458,7 +462,8 @@ function official(b) {
 }
 
 const state = { tab: 'map', kind: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false,
-  grouped: true, sort: 'space', view: 'cards', markFilter: new Set(), buyFilter: 'all' };
+  grouped: true, sort: 'space', view: 'cards', markFilter: new Set(), buyFilter: 'all',
+  bldg: '' };
 
 /**
  * チェック・購入・メモは端末内(localStorage)にだけ保存する。サーバは無い。
@@ -840,19 +845,20 @@ function renderMap(rows) {
   const { spaces, strays } = buildSpaceIndex(rows);
   let html = '';
 
-  for (const { area, rows: hallRows } of VENUE) {
-    // joined の列は 1 棟。西1・西2 は間仕切りがあるだけの地続きなので枠をひとつにする
-    const body = hallRows.map(hr =>
-      '<div class="mhallrow' + (hr.joined ? ' joined' : '') + '">' +
-      hr.halls.map(h => hallHtml(area, h, spaces)).join('') + '</div>'
-    ).join('');
-    html += '<div class="marea" data-area="' + esc(area) + '"><h3>' + esc(area) + '地区</h3>' +
-            '<div class="mhallrows">' + body + '</div></div>';
+  // 会場を真上から見た並びのまま組む。棟が横に並ぶ段はそのまま横に並べる
+  for (const row of FLOOR) {
+    const shown = row.buildings.filter(b => !state.bldg || state.bldg === b.id);
+    if (!shown.length) continue;
+    html += '<div class="frow">' + shown.map(b =>
+      '<div class="bldg" data-area="' + esc(b.area) + '" data-id="' + esc(b.id) + '">' +
+      '<div class="bhalls">' + b.halls.map(h => hallHtml(b.area, h, spaces)).join('') + '</div></div>'
+    ).join('') + '</div>';
   }
 
-  if (strays.size) {
+  if (strays.size && !state.bldg) {
     const list = [...strays.entries()].map(([k, n]) => esc(k.replace('/', ' ')) + ' (' + n + ')').join('  ');
-    html += '<div class="marea"><h3>構成表に無いブロック</h3><div class="note">' + list + '</div></div>';
+    html += '<div class="frow"><div class="bldg stray"><h4>構成表に無いブロック</h4>' +
+            '<div class="note">' + list + '</div></div></div>';
   }
 
   document.getElementById('mapcanvas').innerHTML = html;
@@ -869,7 +875,9 @@ function measureCanvas() {
   const canvas = document.getElementById('mapcanvas');
   const t = canvas.style.transform;
   canvas.style.transform = 'none';
-  natural = { w: canvas.scrollWidth, h: canvas.scrollHeight };
+  // scrollHeight は下の padding を含まないことがあり、sizer と 数 px ずれる。
+  // 見た目の箱そのものを測る offset* のほうが合う
+  natural = { w: canvas.offsetWidth, h: canvas.offsetHeight };
   canvas.style.transform = t;
 }
 
@@ -890,12 +898,28 @@ function applyZoom(z) {
   document.getElementById('zoomlabel').textContent = Math.round(zoom * 100) + '%';
 }
 
-/** 会場全体が幅に収まる倍率にして左上へ戻す */
+/**
+ * 地図を画面の残りにちょうど収める。
+ * 見出しと絞り込みの下に固定の高さで置くと、地図の中とページの両方がスクロールして
+ * どちらを動かしているのか分からなくなる。残りいっぱいまで伸ばして外側は動かさない。
+ */
+function sizeMapScroll() {
+  const scroll = document.getElementById('mapscroll');
+  const top = scroll.getBoundingClientRect().top + window.scrollY;
+  // flex: 1 のままだと height を無視されるので、こちらで決めると宣言してから入れる
+  scroll.style.flex = 'none';
+  scroll.style.height = Math.max(300, window.innerHeight - top - 16) + 'px';
+}
+
+/** 会場が丸ごと収まる倍率にして左上へ戻す。縦も入れないと南まで見えない */
 function fitZoom() {
+  sizeMapScroll();
   measureCanvas();
   const scroll = document.getElementById('mapscroll');
   const pad = 4;
-  applyZoom(natural.w ? (scroll.clientWidth - pad) / natural.w : 1);
+  const byW = natural.w ? (scroll.clientWidth - pad) / natural.w : 1;
+  const byH = natural.h ? (scroll.clientHeight - pad) / natural.h : 1;
+  applyZoom(Math.min(byW, byH));
   scroll.scrollTo(0, 0);
 }
 
@@ -1299,6 +1323,18 @@ mapScroll.addEventListener('touchend', ev => {
   lastTap = now;
 }, { passive: true });
 
+// 棟の絞り込み。押した棟だけを描き直し、全体に収める
+document.getElementById('bldgbar').addEventListener('click', ev => {
+  const btn = ev.target.closest('.chip');
+  if (!btn) return;
+  state.bldg = btn.dataset.bldg;
+  for (const c of document.querySelectorAll('#bldgbar .chip')) {
+    c.setAttribute('aria-pressed', String(c.dataset.bldg === state.bldg));
+  }
+  render();
+  fitZoom();
+});
+
 const lightbox = document.getElementById('lightbox');
 document.getElementById('grid').addEventListener('click', ev => {
   if (handleMark(ev)) return;
@@ -1340,13 +1376,21 @@ new IntersectionObserver(entries => {
 initSeen([...DATA.circles, ...DATA.cosplayers, ...DATA.unclassified]);
 render();
 fitZoom();
-addEventListener('resize', () => { if (state.view === 'map') fitZoom(); });
+// フォントが差し替わると地図の実寸が数 px 変わる。落ち着いてからもう一度測って合わせ直す
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => { if (state.tab === 'map') fitZoom(); });
+}
+addEventListener('resize', () => { if (state.tab === 'map') fitZoom(); });
 `;
 
 export function renderHtml(dataset: Dataset): string {
     const { stats, event, generatedAt } = dataset;
     const dayChips = event.days
         .map((d) => `<button class="chip" type="button" data-value="${d.day}" aria-pressed="false">${d.label}</button>`)
+        .join('');
+    // 地図の絞り込みは棟単位。会場でも「東は東、西は西」でしか動かない
+    const bldgChips = buildingIds()
+        .map((id) => `<button class="chip" type="button" data-bldg="${id}" aria-pressed="false">${id}</button>`)
         .join('');
 
     return `<!doctype html>
@@ -1415,6 +1459,10 @@ export function renderHtml(dataset: Dataset): string {
   </div>
 
   <div class="mapwrap" id="mapwrap">
+    <div class="bldgbar" id="bldgbar">
+      <button class="chip" type="button" data-bldg="" aria-pressed="true">全体</button>
+      ${bldgChips}
+    </div>
     <div class="mapbar">
       <span class="note">公式配置図のホール構成に沿った地図です。通路や島の細かな位置までは再現していません —
         正確な配置は <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">コミケWebカタログ</a> で確認してください</span>
@@ -1453,7 +1501,7 @@ export function renderHtml(dataset: Dataset): string {
 <div id="lightbox"><img alt=""></div>
 
 <script type="application/json" id="c108-data">${embedJson(dataset)}</script>
-<script>${JS.replace('__VENUE__', JSON.stringify(VENUE)).replace('__HALL_OF__', JSON.stringify(buildHallLookup())).replace('__BLOCK_OF__', JSON.stringify(buildBlockLookup()))}</script>
+<script>${JS.replace('__FLOOR__', JSON.stringify(FLOOR)).replace('__HALL_OF__', JSON.stringify(buildHallLookup())).replace('__BLOCK_OF__', JSON.stringify(buildBlockLookup()))}</script>
 </body>
 </html>
 `;

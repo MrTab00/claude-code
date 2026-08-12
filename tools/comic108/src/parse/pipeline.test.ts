@@ -162,10 +162,15 @@ check('セ は東2、ス は東1', /"東\/セ":"2"/.test(html) && /"東\/ス":"1
 // 西2 の下段は上段の右端(さこけくき)の真下に付く。西1 の左右反転
 check('西2 の下段は右寄せ', /"letterAfter":2,"align":"right"/.test(html));
 // 会場の外枠とホールの枠。どこからどこまでが 1 つの建物か分かるようにする
-// 西1・西2 は地続きなので 1 つの枠にまとめる
-check('西1・西2 が 1 棟になっている',
-    /"joined":true/.test(html) && /\.mhallrow\.joined\s*\{/.test(html));
-check('地区の外枠がある', html.includes('class="marea" data-area=') && /\.marea\s*\{[^}]*border:\s*3px/.test(html));
+// 会場を真上から見た並び: 東1・2・3 が 1 段目、東7 と西が 2 段目、南が 3 段目
+check('棟の並びが会場どおり',
+    /"buildings":\[\{"id":"東123"/.test(html) &&
+    /"id":"東7"[\s\S]{0,4000}?"id":"西"/.test(html) &&
+    /"id":"南"/.test(html));
+// 東1〜3 / 西1・2 / 南1・2 はそれぞれ地続きなので、棟の枠はひとつで中を仕切る
+check('西1・西2 が 1 棟になっている', /"id":"西","area":"西","halls":\[\{"hall":"1"[\s\S]*?\{"hall":"2"/.test(html));
+check('棟の外枠と中の仕切りがある', /\.bldg\s*\{[^}]*border:\s*2px/.test(html) && html.includes('.bhalls > .mhall + .mhall'));
+check('棟で絞り込むチップがある', html.includes('data-bldg="東123"') && html.includes('data-bldg="南"'));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));
 check('西は平仮名、南は英小字', /"西\/め":"1"/.test(html) && /"南\/t":"1"/.test(html));
 check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));
