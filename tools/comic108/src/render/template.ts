@@ -7,6 +7,7 @@
  */
 
 import type { Dataset } from '../types';
+import { VENUE, buildBlockLookup, buildHallLookup } from './venue';
 
 /** JSON 内嵌进 <script> 时必须把 < 转义掉, 否则 "</script>" 会提前闭合标签 */
 function embedJson(data: unknown): string {
@@ -143,6 +144,20 @@ body {
 .chip[data-value="南"][aria-pressed="true"] { background: var(--south-soft); border-color: var(--south); color: var(--south); }
 .count { margin-left: auto; font: 500 12.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 
+/* --- 配置マップ: 公式のホール構成に合わせたブロック索引 --- */
+.arearow { display: flex; flex-direction: column; gap: 7px; }
+.arearow > h3 { font-size: 12px; margin: 0; color: var(--muted); font-weight: 600; }
+.halls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+.hall {
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px 8px;
+  display: flex; flex-direction: column; gap: 5px; background: var(--surface-2);
+}
+.hall > .name { font: 600 11.5px var(--mono); color: var(--muted); }
+.hall[data-area="東"] > .name { color: var(--east); }
+.hall[data-area="西"] > .name { color: var(--west); }
+.hall[data-area="南"] > .name { color: var(--south); }
+.cell[data-level="0"] { opacity: .32; cursor: default; }
+
 /* --- 配置マップ --- */
 .mapview {
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
@@ -166,7 +181,7 @@ body {
 .cells { display: flex; gap: 4px; flex-wrap: wrap; }
 .cell {
   appearance: none; cursor: pointer; border-radius: 5px; padding: 3px 0 4px;
-  width: 40px; text-align: center; border: 1px solid var(--border); background: var(--surface-2);
+  width: 34px; text-align: center; border: 1px solid var(--border); background: var(--surface);
   display: flex; flex-direction: column; gap: 1px; line-height: 1.15;
 }
 .cell b { font: 600 13px var(--mono); color: var(--ink); }
@@ -341,6 +356,19 @@ const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]))
 
 const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
+// 公式配置図から起こしたホール構成と、ブロック→ホールの逆引き
+const VENUE = __VENUE__;
+const HALL_OF = __HALL_OF__;
+const BLOCK_OF = __BLOCK_OF__;
+
+/** ツイートの配置を公式表記に揃える。揃わないものは null(構成表に無いブロック) */
+function official(b) {
+  if (!b || !b.block || !b.area) return null;
+  const key = b.area + '/' + String(b.block).toLowerCase();
+  const hall = HALL_OF[key];
+  return hall ? { area: b.area, hall, block: BLOCK_OF[key] } : null;
+}
+
 const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false,
   grouped: true, sort: 'space', cell: null, view: 'cards', markFilter: new Set(), buyFilter: 'all' };
 
@@ -470,9 +498,12 @@ const entryAreas = e => [...new Set((e.booths || []).map(b => b.area).filter(Boo
 /** ブロック格子で選んだマスに、この項目のどれかの配置が入っているか */
 function inCell(e) {
   if (!state.cell) return true;
-  const { day, area, hall, block } = state.cell;
-  return (e.booths || []).some(b =>
-    b.block === block && b.area === area && (b.hall ?? '') === hall && (b.day ?? 0) === day);
+  const { area, hall, block } = state.cell;
+  // マスの側と同じ正規化を通してから比べる
+  return (e.booths || []).some(b => {
+    const o = official(b);
+    return o ? o.area === area && o.hall === hall && o.block === block : false;
+  });
 }
 
 function matches(e) {
@@ -593,73 +624,70 @@ function rowsFor(tab) {
   return state.grouped ? groupByAccount(DATA[tab]) : DATA[tab];
 }
 
-/** 英字 → 片仮名 → 平仮名 の順。地区ごとに使う文字種が違うので、混ざっても崩れないようにする */
-function blockOrder(ch) {
-  const c = ch.codePointAt(0);
-  if (c < 0x3000) return c;            // A-Z
-  if (c >= 0x30a1) return 10000 + c;   // カタカナ
-  return 20000 + c;                    // ひらがな
-}
-
 /**
- * 収集できた配置からブロックの索引を組み立てる。
+ * 収集できた配置を「地区 → ホール → ブロック」で数える。
  *
- * 公式の会場平面図ではない —— ホール内の物理的な並びは手元のデータからは分からないので、
- * それらしい図を描くと現地で迷わせる。ここに出るのは「採れた配置がどのブロックに何件あるか」
- * だけで、全部が実データ由来。
+ * ホール番号を書かないツイートがとても多いが、ブロック記号が分かればホールは
+ * 公式の構成から一意に決まるので、書かれていなくても正しい箱に入れられる。
  */
 function buildBlockIndex(rows) {
-  const days = new Map();
+  const counts = new Map(); // "地区/ホール/ブロック" -> 件数
+  const strays = new Map(); // 公式の構成に無いブロック
   for (const e of rows) {
     for (const b of e.booths || []) {
-      if (!b.block || !b.area) continue;
-      const day = b.day ?? 0;
-      const hall = b.hall ?? '';
-      if (!days.has(day)) days.set(day, new Map());
-      const areas = days.get(day);
-      if (!areas.has(b.area)) areas.set(b.area, new Map());
-      const halls = areas.get(b.area);
-      if (!halls.has(hall)) halls.set(hall, new Map());
-      const blocks = halls.get(hall);
-      blocks.set(b.block, (blocks.get(b.block) || 0) + 1);
+      // ブロック記号の方を信じる。ツイートのホール番号は間違っていることがあり、
+      // 大文字小文字も揺れる。そのまま使うと構成表に無い箱を指してマスごと消える。
+      const o = official(b);
+      if (!o) {
+        if (b.block && b.area) {
+          const k = b.area + '/' + b.block;
+          strays.set(k, (strays.get(k) || 0) + 1);
+        }
+        continue;
+      }
+      const key = o.area + '/' + o.hall + '/' + o.block;
+      counts.set(key, (counts.get(key) || 0) + 1);
     }
   }
-  return days;
+  return { counts, strays };
+}
+
+function cellHtml(area, hall, block, n, max) {
+  const level = n === 0 ? 0 : n >= max * 0.66 ? 3 : n >= max * 0.33 ? 2 : 1;
+  const on = state.cell && state.cell.area === area && state.cell.hall === hall && state.cell.block === block;
+  return '<button class="cell" type="button" data-area="' + esc(area) + '" data-level="' + level +
+    '" data-hall="' + esc(hall) + '" data-block="' + esc(block) + '"' +
+    (n === 0 ? ' disabled' : '') +
+    ' aria-pressed="' + (on ? 'true' : 'false') + '"><b>' + esc(block) + '</b><i>' + n + '</i></button>';
 }
 
 function renderMap(rows) {
   const view = document.getElementById('mapview');
   if (state.tab !== 'circles') { view.hidden = true; return; }
+  view.hidden = false;
 
-  const index = buildBlockIndex(rows);
-  view.hidden = index.size === 0;
-  if (!index.size) return;
-
-  const max = Math.max(...[...index.values()].flatMap(a => [...a.values()].flatMap(h => [...h.values()].flatMap(b => [...b.values()]))));
-  const dayKeys = [...index.keys()].sort();
+  const { counts, strays } = buildBlockIndex(rows);
+  const max = Math.max(1, ...counts.values());
   let html = '';
 
-  for (const day of dayKeys) {
-    html += '<div class="dayblock"><h3>' + esc(DAY_LABEL[day] || '日程不明') + '</h3>';
-    for (const area of ['東', '西', '南']) {
-      const halls = index.get(day).get(area);
-      if (!halls) continue;
-      const hallKeys = [...halls.keys()].sort((a, b) => (Number(a) || 99) - (Number(b) || 99));
-      for (const hall of hallKeys) {
-        const blocks = [...halls.get(hall).entries()].sort((a, b) => blockOrder(a[0]) - blockOrder(b[0]));
-        html += '<div class="hallrow"><span class="label">' + esc(area) + (hall ? esc(hall) + 'ホール' : '地区') + '</span><div class="cells">';
-        for (const [block, n] of blocks) {
-          const level = n >= max * 0.66 ? 3 : n >= max * 0.33 ? 2 : 1;
-          const on = state.cell && state.cell.day === day && state.cell.area === area &&
-                     state.cell.hall === hall && state.cell.block === block;
-          html += '<button class="cell" type="button" data-area="' + esc(area) + '" data-level="' + level +
-                  '" data-day="' + day + '" data-hall="' + esc(hall) + '" data-block="' + esc(block) +
-                  '" aria-pressed="' + (on ? 'true' : 'false') + '"><b>' + esc(block) + '</b><i>' + n + '</i></button>';
-        }
-        html += '</div></div>';
-      }
+  for (const { area, halls } of VENUE) {
+    let inner = '';
+    for (const { hall, blocks } of halls) {
+      const cells = blocks.map(b => cellHtml(area, hall, b, counts.get(area + '/' + hall + '/' + b) || 0, max)).join('');
+      inner += '<div class="hall" data-area="' + esc(area) + '"><span class="name">' + esc(area + hall) +
+               'ホール</span><div class="cells">' + cells + '</div></div>';
     }
-    html += '</div>';
+    html += '<div class="arearow"><h3>' + esc(area) + '地区</h3><div class="halls">' + inner + '</div></div>';
+  }
+
+  // 公式の構成に無いブロックは黙って捨てず、別枠で出す(解析ミスに気づけるように)
+  if (strays.size) {
+    const cells = [...strays.entries()].map(([k, n]) => {
+      const [area, block] = k.split('/');
+      return cellHtml(area, '', block, n, max);
+    }).join('');
+    html += '<div class="arearow"><h3>構成表に無いブロック</h3><div class="halls">' +
+            '<div class="hall"><span class="name">要確認</span><div class="cells">' + cells + '</div></div></div></div>';
   }
 
   view.querySelector('.cellwrap').innerHTML = html;
@@ -988,13 +1016,8 @@ document.getElementById('mapview').addEventListener('click', ev => {
   if (ev.target.closest('.clear')) { state.cell = null; render(); return; }
   const cell = ev.target.closest('.cell');
   if (!cell) return;
-  const picked = {
-    day: Number(cell.dataset.day),
-    area: cell.dataset.area,
-    hall: cell.dataset.hall,
-    block: cell.dataset.block,
-  };
-  const same = state.cell && ['day', 'area', 'hall', 'block'].every(k => state.cell[k] === picked[k]);
+  const picked = { area: cell.dataset.area, hall: cell.dataset.hall, block: cell.dataset.block };
+  const same = state.cell && ['area', 'hall', 'block'].every(k => state.cell[k] === picked[k]);
   state.cell = same ? null : picked;
   render();
 });
@@ -1142,7 +1165,7 @@ export function renderHtml(dataset: Dataset): string {
 <div id="lightbox"><img alt=""></div>
 
 <script type="application/json" id="c108-data">${embedJson(dataset)}</script>
-<script>${JS}</script>
+<script>${JS.replace('__VENUE__', JSON.stringify(VENUE)).replace('__HALL_OF__', JSON.stringify(buildHallLookup())).replace('__BLOCK_OF__', JSON.stringify(buildBlockLookup()))}</script>
 </body>
 </html>
 `;
