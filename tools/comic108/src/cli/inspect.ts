@@ -88,6 +88,7 @@ console.log(`
   サークル系    ${dataset.circles.length} 件
   コスプレ系    ${dataset.cosplayers.length} 件
   対象外        ${dataset.stats.dropped} 件
+  プロフ取得済  ${tweets.filter((t) => (t.bio ?? '').trim()).length} 件(応答に自己紹介が入っていたツイート)
 
 === 配置の取得元 ===
   合計          ${withBooth.length} / ${dataset.circles.length} 件${pct(withBooth.length)}

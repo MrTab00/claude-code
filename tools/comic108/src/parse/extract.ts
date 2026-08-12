@@ -44,12 +44,14 @@ function readUser(node: Json): { screenName: string; displayName: string; avatar
     const legacy = (user.legacy ?? {}) as Json;
     const core = (user.core ?? {}) as Json;
     const avatarSrc = (user.avatar ?? {}) as Json;
+    // 自己紹介は legacy.description にあるが、新しい応答では profile_bio に移っている
+    const profileBio = (user.profile_bio ?? {}) as Json;
 
     return {
         screenName: String(core.screen_name ?? legacy.screen_name ?? ''),
         displayName: String(core.name ?? legacy.name ?? ''),
         avatar: (avatarSrc.image_url ?? legacy.profile_image_url_https) as string | undefined,
-        bio: (legacy.description ?? core.description) as string | undefined,
+        bio: (legacy.description ?? profileBio.description ?? core.description) as string | undefined,
     };
 }
 
