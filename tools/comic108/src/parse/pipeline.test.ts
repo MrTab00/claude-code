@@ -155,7 +155,10 @@ check(
 );
 check('地図の枠がある', html.includes('id="mapcanvas"') && html.includes('id="zoom-fit"'));
 // 公式配置図から起こしたホール構成が埋め込まれていること
-check('会場のホール構成が入っている', /"hall":"7"/.test(html) && /"spaces":48/.test(html));
+check('会場のホール構成が入っている', /"hall":"7"/.test(html) && /"block":"M","bands":\[12,12\]/.test(html));
+// 島の段数はブロックごとに違う。均等に並べると会場と違う形になる
+check('端の島が短くなっている', /"block":"ヨ","bands":\[7,6,6,8\]/.test(html) && /"block":"ユ","bands":\[8,8,8,9\]/.test(html));
+check('セ は東2、ス は東1', /"東\/セ":"2"/.test(html) && /"東\/ス":"1"/.test(html));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));
 check('西は平仮名、南は英小字', /"西\/め":"1"/.test(html) && /"南\/t":"1"/.test(html));
 check('チェックボタンが出る', html.includes('mark-filter') && html.includes('buy-filter'));

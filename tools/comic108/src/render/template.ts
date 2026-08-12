@@ -198,9 +198,12 @@ body {
 .hsection { display: flex; gap: 20px; align-items: flex-start; }
 .hgroup { display: flex; gap: 5px; align-items: flex-start; }
 
-.island { display: flex; flex-direction: column; gap: 3px; align-items: center; }
-.island > .blk { font: 700 12px var(--mono); color: var(--ink); }
+/* 島は通路で横に切られている。その隙間がこの gap */
+.island { display: flex; flex-direction: column; gap: 7px; align-items: center; }
+.island > .blk { font: 700 13px var(--mono); color: var(--ink); line-height: 1; }
 .island.wall > .blk { writing-mode: horizontal-tb; }
+/* 段の枠。短い島をその段の中で通路側に寄せるためだけのもの */
+.bandslot { display: flex; }
 /*
  * 島は 2 列。空きスペースは背景の線で描くので要素を作らない ——
  * 800 サークル規模で 6000 個の空マスを置くと重すぎる。
@@ -701,51 +704,102 @@ function buildSpaceIndex(rows) {
 }
 
 /**
- * 島の中でのスペースの位置。
- * 配置図どおり、右列を下から上へ 1..N/2、左列を上から下へ N/2+1..N と蛇行させる。
+ * 島の中でのスペースの位置。venue.ts の spacePosition と同じ規則。
+ *
+ * 配置図どおり、右列を下から上へ 1..N/2、左列を上から下へ N/2+1..N と蛇行させる
+ * (島の最下段が「N｜1」になっているのがその形)。島は通路で何段かに切られているので、
+ * 上から数えた行番号がどの段に入るかも返す。
  */
-function spaceCell(num, total) {
-  const half = Math.ceil(total / 2);
-  if (num <= half) return { col: 2, row: half - num + 1 };
-  return { col: 1, row: Math.min(num - half, half) };
+function spacePos(num, bands) {
+  const half = bands.reduce((a, b) => a + b, 0);
+  if (num < 1 || num > half * 2) return null;
+  const col = num <= half ? 2 : 1;
+  const fromTop = num <= half ? half - num + 1 : num - half;
+
+  let rest = fromTop;
+  for (let b = 0; b < bands.length; b++) {
+    if (rest <= bands[b]) return { band: b, row: rest, col: col };
+    rest -= bands[b];
+  }
+  return null;
 }
 
-function islandHtml(area, hallNo, block, total, spaces, isWall) {
-  // 実データが目安を超えていたら島を伸ばす。番号が枠外に落ちて消えるより良い
-  let maxNum = total;
-  for (let n = total + 1; n <= total + 30; n++) {
-    if (spaces.has(area + '/' + hallNo + '/' + block + '/' + n)) maxNum = n;
-  }
-  const half = Math.ceil(maxNum / 2);
+/**
+ * その段で最も背の高い島に合わせた各段の行数。
+ * 短い島は通路側に寄せる(配置図でも端の島は通路の側から詰まっている)ので、
+ * どの島も同じ高さの枠に入れておくとブロック記号の行が揃う。
+ */
+function sectionSlots(section) {
+  const all = section.groups.flat();
+  const depth = Math.max(...all.map(i => i.bands.length));
+  const slots = [];
+  for (let i = 0; i < depth; i++) slots.push(Math.max(...all.map(x => x.bands[i] || 0)));
+  return slots;
+}
 
-  let cells = '';
-  for (let n = 1; n <= maxNum; n++) {
-    const at = spaces.get(area + '/' + hallNo + '/' + block + '/' + n);
+function islandHtml(area, hallNo, island, slots, letterAfter, spaces, isWall) {
+  const block = island.block;
+  const key = n => area + '/' + hallNo + '/' + block + '/' + n;
+
+  const bands = island.bands.slice();
+  let total = bands.reduce((a, b) => a + b, 0) * 2;
+
+  // 実データが配置図を超えていたら最下段を伸ばす。番号が枠外に落ちて消えるより良い。
+  // ただしブロック記号より上を伸ばすと記号の行が隣とずれるので、その場合は段を足す
+  let maxNum = total;
+  for (let n = total + 1; n <= total + 40; n++) if (spaces.has(key(n))) maxNum = n;
+  if (maxNum > total) {
+    const extra = Math.ceil((maxNum - total) / 2);
+    if (bands.length - 1 > letterAfter) bands[bands.length - 1] += extra;
+    else bands.push(extra);
+    total += extra * 2;
+  }
+
+  const cells = bands.map(() => '');
+  for (let n = 1; n <= total; n++) {
+    const at = spaces.get(key(n));
     if (!at || !at.length) continue;
-    const { col, row } = spaceCell(n, maxNum);
+    const p = spacePos(n, bands);
+    if (!p) continue;
     const names = at.map(e => e.circleName || e.displayName);
     const mark = markOf(at[0].screenName).s;
-    cells += '<button class="sp" type="button" data-area="' + esc(area) + '"' +
+    cells[p.band] += '<button class="sp" type="button" data-area="' + esc(area) + '"' +
       (mark ? ' data-mark="' + mark + '"' : '') +
-      ' data-sn="' + esc(at[0].screenName) + '" style="grid-column:' + col + ';grid-row:' + row + '"' +
+      ' data-sn="' + esc(at[0].screenName) + '" style="grid-column:' + p.col + ';grid-row:' + p.row + '"' +
       ' title="' + esc(area + hallNo + ' ' + block + '-' + String(n).padStart(2, '0') + '  ' + names.join(' / ')) + '">' +
       '<span class="num">' + n + '</span><span class="nm">' + esc(names.join('/')) + '</span></button>';
   }
-  return '<div class="island' + (isWall ? ' wall' : '') + '"><span class="blk">' + esc(block) + '</span>' +
-    '<div class="grid2" style="grid-template-rows:repeat(' + half + ',var(--sh))">' + cells + '</div></div>';
+
+  // ブロック記号は配置図と同じく通路の切れ目に置く。壁は帯が 1 本なので先頭
+  const label = '<span class="blk">' + esc(block) + '</span>';
+  let body = letterAfter < 0 ? label : '';
+  bands.forEach((rows, i) => {
+    const slot = Math.max(slots[i] || 0, rows);
+    // 偶数段は下寄せ、奇数段は上寄せ。こうすると短い島が通路の側へ詰まる
+    const align = i % 2 === 0 ? 'flex-end' : 'flex-start';
+    body += '<div class="bandslot" style="height:calc(' + slot + ' * var(--sh) + 2px);align-items:' + align + '">' +
+      '<div class="grid2" style="grid-template-rows:repeat(' + rows + ',var(--sh))">' + cells[i] + '</div></div>';
+    if (i === letterAfter) body += label;
+  });
+
+  return '<div class="island' + (isWall ? ' wall' : '') + '">' + body + '</div>';
 }
 
 /** ホール 1 つ。段 → 通路で区切られたまとまり → 島、の順に組む */
 function hallHtml(area, hall, spaces) {
-  const island = (b, isWall) => islandHtml(area, hall.hall, b, hall.spaces, spaces, isWall);
+  const sections = hall.sections.map(sec => {
+    const slots = sectionSlots(sec);
+    return '<div class="hsection">' + sec.groups.map(group =>
+      '<div class="hgroup">' + group.map(isl =>
+        islandHtml(area, hall.hall, isl, slots, sec.letterAfter, spaces, false)
+      ).join('') + '</div>'
+    ).join('') + '</div>';
+  }).join('');
 
-  const sections = hall.rows.map(row =>
-    '<div class="hsection">' + row.map(group =>
-      '<div class="hgroup">' + group.map(b => island(b, false)).join('') + '</div>'
-    ).join('') + '</div>'
-  ).join('');
-
-  const wall = hall.wall ? island(hall.wall.block, true) : '';
+  const wall = hall.wall
+    ? islandHtml(area, hall.hall, { block: hall.wall.block, bands: [Math.ceil(hall.wall.spaces / 2)] },
+        [], -1, spaces, true)
+    : '';
   const body = hall.wall && hall.wall.side === 'left'
     ? wall + '<div class="hsections">' + sections + '</div>'
     : '<div class="hsections">' + sections + '</div>' + wall;
