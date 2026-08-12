@@ -136,6 +136,46 @@ body {
 .chip[data-value="南"][aria-pressed="true"] { background: var(--south-soft); border-color: var(--south); color: var(--south); }
 .count { margin-left: auto; font: 500 12.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 
+/* --- 配置マップ --- */
+.mapview {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px;
+}
+.mapview > header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mapview h2 { font-size: 14px; margin: 0; font-weight: 600; }
+.mapview .note { font-size: 11.5px; color: var(--muted); }
+.mapview .note a { color: var(--accent); }
+.mapview .clear {
+  margin-left: auto; appearance: none; border: 1px solid var(--accent); background: var(--accent-soft);
+  color: var(--accent); border-radius: 6px; padding: 4px 10px; font: 500 12px var(--sans); cursor: pointer;
+}
+.dayblock { display: flex; flex-direction: column; gap: 6px; }
+.dayblock > h3 { font-size: 12px; margin: 0; color: var(--muted); font-weight: 600; }
+.hallrow { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.hallrow > .label {
+  font: 600 11.5px var(--mono); color: var(--muted); min-width: 76px; padding-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.cells { display: flex; gap: 4px; flex-wrap: wrap; }
+.cell {
+  appearance: none; cursor: pointer; border-radius: 5px; padding: 3px 0 4px;
+  width: 40px; text-align: center; border: 1px solid var(--border); background: var(--surface-2);
+  display: flex; flex-direction: column; gap: 1px; line-height: 1.15;
+}
+.cell b { font: 600 13px var(--mono); color: var(--ink); }
+.cell i { font: 500 10.5px var(--mono); font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cell[data-area="東"] { border-color: color-mix(in srgb, var(--east) 35%, var(--border)); }
+.cell[data-area="西"] { border-color: color-mix(in srgb, var(--west) 35%, var(--border)); }
+.cell[data-area="南"] { border-color: color-mix(in srgb, var(--south) 35%, var(--border)); }
+.cell[data-level="2"][data-area="東"] { background: var(--east-soft); }
+.cell[data-level="2"][data-area="西"] { background: var(--west-soft); }
+.cell[data-level="2"][data-area="南"] { background: var(--south-soft); }
+.cell[data-level="3"][data-area="東"] { background: var(--east-soft); box-shadow: inset 0 0 0 1px var(--east); }
+.cell[data-level="3"][data-area="西"] { background: var(--west-soft); box-shadow: inset 0 0 0 1px var(--west); }
+.cell[data-level="3"][data-area="南"] { background: var(--south-soft); box-shadow: inset 0 0 0 1px var(--south); }
+.cell[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+.cell[aria-pressed="true"] b, .cell[aria-pressed="true"] i { color: var(--accent-ink); }
+
 /* --- カード --- */
 .grid { display: grid; gap: 13px; grid-template-columns: repeat(auto-fill, minmax(322px, 1fr)); }
 .card {
@@ -218,7 +258,7 @@ const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]))
 
 const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
-const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false, grouped: true, sort: 'space' };
+const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false, grouped: true, sort: 'space', cell: null };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 // ローカル保存 > 埋め込み > ホットリンク の順。保存してあれば X 側が消えても残る
@@ -312,6 +352,14 @@ function groupByAccount(list) {
 }
 const entryAreas = e => [...new Set((e.booths || []).map(b => b.area).filter(Boolean))];
 
+/** ブロック格子で選んだマスに、この項目のどれかの配置が入っているか */
+function inCell(e) {
+  if (!state.cell) return true;
+  const { day, area, hall, block } = state.cell;
+  return (e.booths || []).some(b =>
+    b.block === block && b.area === area && (b.hall ?? '') === hall && (b.day ?? 0) === day);
+}
+
 function matches(e) {
   if (state.q && !haystack(e).includes(state.q)) return false;
   if (state.mediaOnly && !(e.media && e.media.length)) return false;
@@ -395,9 +443,85 @@ function rowsFor(tab) {
   return state.grouped ? groupByAccount(DATA[tab]) : DATA[tab];
 }
 
+/** 英字 → 片仮名 → 平仮名 の順。地区ごとに使う文字種が違うので、混ざっても崩れないようにする */
+function blockOrder(ch) {
+  const c = ch.codePointAt(0);
+  if (c < 0x3000) return c;            // A-Z
+  if (c >= 0x30a1) return 10000 + c;   // カタカナ
+  return 20000 + c;                    // ひらがな
+}
+
+/**
+ * 収集できた配置からブロックの索引を組み立てる。
+ *
+ * 公式の会場平面図ではない —— ホール内の物理的な並びは手元のデータからは分からないので、
+ * それらしい図を描くと現地で迷わせる。ここに出るのは「採れた配置がどのブロックに何件あるか」
+ * だけで、全部が実データ由来。
+ */
+function buildBlockIndex(rows) {
+  const days = new Map();
+  for (const e of rows) {
+    for (const b of e.booths || []) {
+      if (!b.block || !b.area) continue;
+      const day = b.day ?? 0;
+      const hall = b.hall ?? '';
+      if (!days.has(day)) days.set(day, new Map());
+      const areas = days.get(day);
+      if (!areas.has(b.area)) areas.set(b.area, new Map());
+      const halls = areas.get(b.area);
+      if (!halls.has(hall)) halls.set(hall, new Map());
+      const blocks = halls.get(hall);
+      blocks.set(b.block, (blocks.get(b.block) || 0) + 1);
+    }
+  }
+  return days;
+}
+
+function renderMap(rows) {
+  const view = document.getElementById('mapview');
+  if (state.tab !== 'circles') { view.hidden = true; return; }
+
+  const index = buildBlockIndex(rows);
+  view.hidden = index.size === 0;
+  if (!index.size) return;
+
+  const max = Math.max(...[...index.values()].flatMap(a => [...a.values()].flatMap(h => [...h.values()].flatMap(b => [...b.values()]))));
+  const dayKeys = [...index.keys()].sort();
+  let html = '';
+
+  for (const day of dayKeys) {
+    html += '<div class="dayblock"><h3>' + esc(DAY_LABEL[day] || '日程不明') + '</h3>';
+    for (const area of ['東', '西', '南']) {
+      const halls = index.get(day).get(area);
+      if (!halls) continue;
+      const hallKeys = [...halls.keys()].sort((a, b) => (Number(a) || 99) - (Number(b) || 99));
+      for (const hall of hallKeys) {
+        const blocks = [...halls.get(hall).entries()].sort((a, b) => blockOrder(a[0]) - blockOrder(b[0]));
+        html += '<div class="hallrow"><span class="label">' + esc(area) + (hall ? esc(hall) + 'ホール' : '地区') + '</span><div class="cells">';
+        for (const [block, n] of blocks) {
+          const level = n >= max * 0.66 ? 3 : n >= max * 0.33 ? 2 : 1;
+          const on = state.cell && state.cell.day === day && state.cell.area === area &&
+                     state.cell.hall === hall && state.cell.block === block;
+          html += '<button class="cell" type="button" data-area="' + esc(area) + '" data-level="' + level +
+                  '" data-day="' + day + '" data-hall="' + esc(hall) + '" data-block="' + esc(block) +
+                  '" aria-pressed="' + (on ? 'true' : 'false') + '"><b>' + esc(block) + '</b><i>' + n + '</i></button>';
+        }
+        html += '</div></div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  view.querySelector('.cellwrap').innerHTML = html;
+  view.querySelector('.clear').hidden = !state.cell;
+}
+
 function render() {
   const all = rowsFor(state.tab);
-  const list = all.filter(matches).sort(state.sort === 'space' ? bySpace : byNewest);
+  // マップはマス選択以外の絞り込みを反映する —— 検索した結果の分布が見えないと索引の意味がない
+  const base = all.filter(matches);
+  renderMap(base);
+  const list = base.filter(inCell).sort(state.sort === 'space' ? bySpace : byNewest);
   document.getElementById('count').textContent =
     list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
 
@@ -465,6 +589,21 @@ document.getElementById('group-toggle').addEventListener('click', ev => {
 document.getElementById('media-only').addEventListener('click', ev => {
   state.mediaOnly = !state.mediaOnly;
   ev.currentTarget.setAttribute('aria-pressed', String(state.mediaOnly));
+  render();
+});
+
+document.getElementById('mapview').addEventListener('click', ev => {
+  if (ev.target.closest('.clear')) { state.cell = null; render(); return; }
+  const cell = ev.target.closest('.cell');
+  if (!cell) return;
+  const picked = {
+    day: Number(cell.dataset.day),
+    area: cell.dataset.area,
+    hall: cell.dataset.hall,
+    block: cell.dataset.block,
+  };
+  const same = state.cell && ['day', 'area', 'hall', 'block'].every(k => state.cell[k] === picked[k]);
+  state.cell = same ? null : picked;
   render();
 });
 
@@ -536,6 +675,16 @@ export function renderHtml(dataset: Dataset): string {
     </div>
     <span class="count" id="count"></span>
   </div>
+
+  <section class="mapview" id="mapview" hidden>
+    <header>
+      <h2>配置マップ</h2>
+      <span class="note">採集できた配置のブロック索引です。公式の会場平面図ではありません —
+        正確な配置図は <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">コミケWebカタログ</a> で確認してください</span>
+      <button class="clear" type="button" hidden>選択を解除</button>
+    </header>
+    <div class="cellwrap"></div>
+  </section>
 
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" hidden>条件に合う項目がありません</div>

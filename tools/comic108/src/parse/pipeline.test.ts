@@ -145,7 +145,14 @@ const html = renderHtml(dataset);
 check('HTML が生成される', html.startsWith('<!doctype html>') && html.length > 5000);
 check('データが埋め込まれている', html.includes('id="c108-data"'));
 check('script タグを閉じてしまう文字列がない', !html.split('id="c108-data">')[1]?.split('</script>')[0]?.includes('</script'));
-check('外部リソースを参照していない', !/(src|href)="https?:\/\/(?!x\.com)/.test(html.replace(/id="c108-data">[\s\S]*?<\/script>/, '')));
+// 外部リソースは読み込まない。リンク先として x.com と公式カタログを指すのは可
+check(
+    '外部リソースを読み込んでいない',
+    !/(src|href)="https?:\/\/(?!x\.com|webcatalog\.circle\.ms)/.test(
+        html.replace(/id="c108-data">[\s\S]*?<\/script>/, ''),
+    ),
+);
+check('配置マップの枠がある', html.includes('id="mapview"'));
 
 console.log(`\nパイプラインテスト: ${checks - failures.length}/${checks} passed\n`);
 if (failures.length) {
