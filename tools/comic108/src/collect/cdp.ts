@@ -11,7 +11,7 @@
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { collect as collectConfig, paths } from '../../config';
+import { collect as collectConfig, event, paths } from '../../config';
 import { collectTweetNodes } from '../parse/extract';
 import type { RawCapture } from '../types';
 import { type CdpConnection, type CdpPage, connectCdp, getResponseBody, openPage } from './cdp-client';
@@ -160,7 +160,11 @@ export interface ScrollOptions {
  * 下端に近づいた時だけ。途中で諦めると 1 ページ目しか採れない。
  * だから空転として数えるのは、下端に到達した(もしくはもう動かない)場合に限る。
  */
-export async function autoScroll(page: CdpPage, capture: Capture, options: ScrollOptions = {}): Promise<void> {
+export async function autoScroll(
+    page: CdpPage,
+    capture: Capture,
+    options: ScrollOptions = {},
+): Promise<{ hitCap: boolean }> {
     const { label = '', maxTweets = collectConfig.maxTweetsPerQuery, delay = randomDelay } = options;
 
     // scrollTop への代入は smooth 指定の影響を受けず必ず即時に効く
@@ -175,7 +179,10 @@ export async function autoScroll(page: CdpPage, capture: Capture, options: Scrol
     let lastY = -1;
 
     for (let round = 0; round < 2000; round++) {
-        if (capture.seenTweets.size >= maxTweets || idle >= collectConfig.idleRoundsBeforeStop) break;
+        // 上限で止まったのか、本当に尽きたのかを呼び出し側に伝える。
+        // 上限で止まったならその期間にはまだ奥がある
+        if (capture.seenTweets.size >= maxTweets) return { hitCap: true };
+        if (idle >= collectConfig.idleRoundsBeforeStop) break;
 
         const m = await page.evaluate<{ y: number; h: number; total: number }>(step);
         await sleep(delay());
@@ -196,6 +203,62 @@ export async function autoScroll(page: CdpPage, capture: Capture, options: Scrol
 
         lastY = m.y;
     }
+    return { hitCap: false };
+}
+
+// --- 期間で区切って掘る ---
+
+export interface SearchWindow {
+    /** since: に入れる日。この日を含む */
+    from: string;
+    /** この日の手前まで。until: には 1 日足したものを入れる */
+    to: string;
+}
+
+const DAY_MS = 86400000;
+const utc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** 窓の日数 */
+export function windowDays(w: SearchWindow): number {
+    return Math.round((utc(w.to) - utc(w.from)) / DAY_MS);
+}
+
+/** 期間を等間隔の窓に割る。新しいほうから先に見たいので、逆順で返す */
+export function splitRange(from: string, to: string, days: number): SearchWindow[] {
+    const out: SearchWindow[] = [];
+    for (let t = utc(from); t < utc(to); t += days * DAY_MS) {
+        out.push({ from: ymd(t), to: ymd(Math.min(t + days * DAY_MS, utc(to))) });
+    }
+    return out.reverse();
+}
+
+/** 上限に当たった窓を半分に割る。1 日まで来たらそれ以上は割れない */
+export function halveWindow(w: SearchWindow): SearchWindow[] {
+    const n = windowDays(w);
+    if (n <= 1) return [];
+    const mid = ymd(utc(w.from) + Math.floor(n / 2) * DAY_MS);
+    // 新しいほうを先に
+    return [
+        { from: mid, to: w.to },
+        { from: w.from, to: mid },
+    ];
+}
+
+/**
+ * 窓を検索式にする。
+ * until: は指定日を含まないので 1 日足す。時差で境界の 1 日が漏れるのを防ぐぶんでもある
+ * (重複したツイートは解析時に rest_id で潰れるので、余分なのは取得の手間だけ)。
+ */
+export function windowQuery(query: string, w: SearchWindow): string {
+    return `${query} since:${w.from} until:${ymd(utc(w.to) + DAY_MS)}`;
+}
+
+/** 設定に from / to が無いときの既定。告知はイベント前の 1〜2 か月に集中する */
+export function defaultRange(): { from: string; to: string } {
+    const first = utc(event.days[0].date);
+    const last = utc(event.days[event.days.length - 1].date);
+    return { from: ymd(first - 45 * DAY_MS), to: ymd(last + 3 * DAY_MS) };
 }
 
 /** Enter が押されるまで待つ */
@@ -269,6 +332,10 @@ export interface CollectResult {
     query: string;
     captures: number;
     tweets: number;
+    /** この検索で初めて見たツイート数。窓を掘る価値があったかの目安 */
+    newTweets: number;
+    /** 上限まで採れて打ち切った = その期間にはまだ奥がある */
+    hitCap: boolean;
     file: string;
     httpErrors: number;
     unreadable: number;
@@ -281,6 +348,7 @@ async function collectQuery(
     query: string,
     runId: string,
     maxTweets: number,
+    seenRun: Set<string> = new Set(),
 ): Promise<CollectResult> {
     const file = join(paths.raw, `${runId}-${slugify(query)}.jsonl`);
     const capture = attachCapture(conn, page, file, query);
@@ -294,8 +362,9 @@ async function collectQuery(
         throw new Error('ログイン画面に飛ばされました。接続先の Chrome で X にログインしてから実行してください。');
     }
 
+    let hitCap = false;
     if (collectConfig.autoScroll) {
-        await autoScroll(page, capture, { label: query, maxTweets });
+        hitCap = (await autoScroll(page, capture, { label: query, maxTweets })).hitCap;
     } else {
         console.log('\n    autoScroll = false: ブラウザで手動スクロールしてください。終わったら Enter。');
         await waitForEnter();
@@ -303,16 +372,24 @@ async function collectQuery(
 
     await capture.detach();
 
+    let newTweets = 0;
+    for (const id of capture.seenTweets) if (!seenRun.has(id)) { seenRun.add(id); newTweets++; }
+
     const trouble =
         capture.httpErrors || capture.unreadable
             ? ` ⚠ HTTP エラー ${capture.httpErrors} 件${capture.lastErrorStatus ? `(直近 ${capture.lastErrorStatus})` : ''} / 読めず ${capture.unreadable} 件`
             : '';
-    process.stdout.write(`\r    ${query} — ${capture.seenTweets.size} 件 (応答 ${capture.captures} 件)${trouble}\n`);
+    process.stdout.write(
+        `\r    ${query} — ${capture.seenTweets.size} 件` +
+            `(新規 ${newTweets} / 応答 ${capture.captures})${hitCap ? ' ⤵ 上限' : ''}${trouble}\n`,
+    );
 
     return {
         query,
         captures: capture.captures,
         tweets: capture.seenTweets.size,
+        newTweets,
+        hitCap,
         file,
         httpErrors: capture.httpErrors,
         unreadable: capture.unreadable,
@@ -322,28 +399,86 @@ async function collectQuery(
 
 export interface CollectOptions {
     autoLaunch?: boolean;
-    /** 1 キーワードあたりの上限。小さくして試し撃ちするのに使う */
+    /** 1 回の検索の上限。小さくして試し撃ちするのに使う */
     maxTweets?: number;
+    /** 期間で切って掘るか。false ならキーワードごとに 1 回だけ検索する */
+    useWindows?: boolean;
+    /** 探す期間。省略すると config か既定の範囲 */
+    from?: string;
+    to?: string;
 }
+
+/** レート制限に当たったら、そのぶん間を置く */
+const RATE_LIMIT_WAIT_MS = 90_000;
 
 export async function collectAll(
     queries = collectConfig.queries,
-    { autoLaunch = true, maxTweets = collectConfig.maxTweetsPerQuery }: CollectOptions = {},
+    {
+        autoLaunch = true,
+        maxTweets = collectConfig.maxTweetsPerQuery,
+        useWindows = collectConfig.window.enabled,
+        from,
+        to,
+    }: CollectOptions = {},
 ): Promise<CollectResult[]> {
     await mkdir(paths.raw, { recursive: true });
+
+    const range = { ...defaultRange() };
+    if (collectConfig.window.from) range.from = collectConfig.window.from;
+    if (collectConfig.window.to) range.to = collectConfig.window.to;
+    if (from) range.from = from;
+    if (to) range.to = to;
 
     const conn = await connect(autoLaunch);
     const page = await openPage(conn, collectConfig.viewport);
     const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const results: CollectResult[] = [];
+    // 走査全体で見たツイート。同じ投稿が別の窓・別のキーワードで何度も出てくる
+    const seenRun = new Set<string>();
 
     try {
         await ensureLoggedIn(page);
 
         for (const [i, query] of queries.entries()) {
-            console.log(`  [${i + 1}/${queries.length}] ${query}`);
-            results.push(await collectQuery(conn, page, query, runId, maxTweets));
-            await sleep(randomDelay());
+            // 窓は新しいほうから。直前の告知がいちばん濃い
+            const queue: (SearchWindow | null)[] = useWindows
+                ? splitRange(range.from, range.to, collectConfig.window.initialDays)
+                : [null];
+            const planned = queue.length;
+            let done = 0;
+
+            console.log(
+                `  [${i + 1}/${queries.length}] ${query}` +
+                    (useWindows ? ` — ${range.from}〜${range.to} を ${planned} 期間から` : ''),
+            );
+
+            while (queue.length && done < collectConfig.window.maxWindowsPerQuery) {
+                const w = queue.shift() ?? null;
+                const q = w ? windowQuery(query, w) : query;
+                const r = await collectQuery(conn, page, q, runId, maxTweets, seenRun);
+                results.push(r);
+                done++;
+
+                // 上限まで採れた窓は、まだ奥に残っているということ。半分に割って掘り直す。
+                // 尽きた窓はそれ以上触らない —— 実りの無い期間に時間をかけない
+                if (w && r.hitCap) {
+                    const halves = halveWindow(w);
+                    if (halves.length) {
+                        queue.unshift(...halves);
+                        console.log(`    ↳ まだ奥がありそうなので ${w.from}〜${w.to} を 2 つに割ります`);
+                    }
+                }
+
+                if (r.lastErrorStatus === 429) {
+                    console.log(`    レート制限(429)。${RATE_LIMIT_WAIT_MS / 1000} 秒待ちます`);
+                    await sleep(RATE_LIMIT_WAIT_MS);
+                }
+                await sleep(randomDelay());
+            }
+
+            if (done >= collectConfig.window.maxWindowsPerQuery) {
+                console.log(`    上限 ${collectConfig.window.maxWindowsPerQuery} 期間に達したので次のキーワードへ`);
+            }
         }
     } finally {
         await page.close().catch(() => {});

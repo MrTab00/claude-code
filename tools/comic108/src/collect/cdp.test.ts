@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { RawCapture } from '../types';
-import { attachCapture, autoScroll, matchOperation } from './cdp';
+import { attachCapture, autoScroll, defaultRange, halveWindow, matchOperation, splitRange, windowDays, windowQuery } from './cdp';
 import { connectCdp, openPage } from './cdp-client';
 
 const CHROME_CANDIDATES = [
@@ -48,7 +48,44 @@ check('doc_id が変わっても名前で拾える', matchOperation('https://x.c
 if (!chromePath) {
     console.log('\nChrome が見つからないため、ブラウザを使う部分はスキップしました。');
     console.log('CHROME_PATH=/path/to/chrome bun run test:collect で実行できます。');
-    console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);
+    // --- 上限で止まったのか、本当に尽きたのか(ブラウザ不要) ---
+// ここを取り違えると、まだ奥が残っている期間を「終わった」と判断して掘るのをやめてしまう。
+{
+    const bottom = { evaluate: async () => ({ y: 0, h: 100, total: 100 }) } as never;
+    const full = { seenTweets: new Set(['a', 'b', 'c']) } as never;
+    const empty = { seenTweets: new Set<string>() } as never;
+
+    check('上限まで採れたら hitCap', (await autoScroll(bottom, full, { maxTweets: 3, delay: () => 0 })).hitCap === true);
+    check('尽きたときは hitCap を立てない',
+        (await autoScroll(bottom, empty, { maxTweets: 999, delay: () => 0 })).hitCap === false);
+}
+
+// --- 期間で区切って掘るときの窓の計算(ブラウザ不要) ---
+// X の検索は 1 回でどこまで遡れるかに上限がある。期間を切って引き直すのが取りこぼし対策だが、
+// 窓に隙間や重なりがあると、まるごと 1 日ぶん落としたり同じ範囲を何度も引いたりする。
+{
+    const ws = splitRange('2026-07-01', '2026-08-19', 14);
+    check('期間を窓に割る', ws.length === 4, ws);
+    check('新しい期間から先に見る', ws[0].from === '2026-08-12', ws[0]);
+    check('窓に隙間も重なりも無い', ws.every((w, i) => i === 0 || ws[i - 1].from === w.to), ws);
+    check('端数の窓は短くなる', windowDays(ws[0]) === 7 && windowDays(ws[1]) === 14, ws.map(windowDays));
+    check('合計が指定した期間と一致', ws.reduce((n, w) => n + windowDays(w), 0) === 49, ws.map(windowDays));
+
+    // until: は指定日を含まない。1 日足しておかないと窓の最終日が毎回落ちる
+    check('until は 1 日先を指す', windowQuery('#C108', ws[0]) === '#C108 since:2026-08-12 until:2026-08-20',
+        windowQuery('#C108', ws[0]));
+
+    const halves = halveWindow(ws[1]);
+    check('上限に当たった窓は半分になる', halves.length === 2 && windowDays(halves[0]) === 7, halves);
+    check('割った窓も新しいほうが先', halves[0].from === '2026-08-05', halves);
+    check('割った窓を足すと元に戻る', halves[1].from === ws[1].from && halves[0].to === ws[1].to, halves);
+    check('1 日まで来たらそれ以上割らない', halveWindow({ from: '2026-08-01', to: '2026-08-02' }).length === 0);
+
+    const range = defaultRange();
+    check('既定の範囲はイベントを含む', range.from < '2026-08-15' && range.to > '2026-08-16', range);
+}
+
+console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);
     if (failures.length) {
         for (const f of failures) console.error(`  ✗ ${f}\n`);
         process.exit(1);
@@ -201,6 +238,43 @@ try {
     server.stop(true);
     await rm(workDir, { recursive: true, force: true });
     await rm(userDataDir, { recursive: true, force: true });
+}
+
+// --- 上限で止まったのか、本当に尽きたのか(ブラウザ不要) ---
+// ここを取り違えると、まだ奥が残っている期間を「終わった」と判断して掘るのをやめてしまう。
+{
+    const bottom = { evaluate: async () => ({ y: 0, h: 100, total: 100 }) } as never;
+    const full = { seenTweets: new Set(['a', 'b', 'c']) } as never;
+    const empty = { seenTweets: new Set<string>() } as never;
+
+    check('上限まで採れたら hitCap', (await autoScroll(bottom, full, { maxTweets: 3, delay: () => 0 })).hitCap === true);
+    check('尽きたときは hitCap を立てない',
+        (await autoScroll(bottom, empty, { maxTweets: 999, delay: () => 0 })).hitCap === false);
+}
+
+// --- 期間で区切って掘るときの窓の計算(ブラウザ不要) ---
+// X の検索は 1 回でどこまで遡れるかに上限がある。期間を切って引き直すのが取りこぼし対策だが、
+// 窓に隙間や重なりがあると、まるごと 1 日ぶん落としたり同じ範囲を何度も引いたりする。
+{
+    const ws = splitRange('2026-07-01', '2026-08-19', 14);
+    check('期間を窓に割る', ws.length === 4, ws);
+    check('新しい期間から先に見る', ws[0].from === '2026-08-12', ws[0]);
+    check('窓に隙間も重なりも無い', ws.every((w, i) => i === 0 || ws[i - 1].from === w.to), ws);
+    check('端数の窓は短くなる', windowDays(ws[0]) === 7 && windowDays(ws[1]) === 14, ws.map(windowDays));
+    check('合計が指定した期間と一致', ws.reduce((n, w) => n + windowDays(w), 0) === 49, ws.map(windowDays));
+
+    // until: は指定日を含まない。1 日足しておかないと窓の最終日が毎回落ちる
+    check('until は 1 日先を指す', windowQuery('#C108', ws[0]) === '#C108 since:2026-08-12 until:2026-08-20',
+        windowQuery('#C108', ws[0]));
+
+    const halves = halveWindow(ws[1]);
+    check('上限に当たった窓は半分になる', halves.length === 2 && windowDays(halves[0]) === 7, halves);
+    check('割った窓も新しいほうが先', halves[0].from === '2026-08-05', halves);
+    check('割った窓を足すと元に戻る', halves[1].from === ws[1].from && halves[0].to === ws[1].to, halves);
+    check('1 日まで来たらそれ以上割らない', halveWindow({ from: '2026-08-01', to: '2026-08-02' }).length === 0);
+
+    const range = defaultRange();
+    check('既定の範囲はイベントを含む', range.from < '2026-08-15' && range.to > '2026-08-16', range);
 }
 
 console.log(`\n採集テスト: ${checks - failures.length}/${checks} passed\n`);
