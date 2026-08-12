@@ -235,6 +235,7 @@ body {
 .foot .src:hover { text-decoration: underline; }
 .flag { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: var(--flag-soft); color: var(--flag); }
 
+#more-sentinel { height: 1px; }
 .empty { text-align: center; color: var(--muted); padding: 64px 16px; font-size: 14px; }
 
 #lightbox {
@@ -691,16 +692,45 @@ function render() {
   } else {
     twrap.hidden = true;
     grid.hidden = false;
-    grid.innerHTML = list.map(cardHtml).join('');
-
-    // 本文が溢れていなければ「全文を表示」は出さない
-    for (const card of grid.children) {
-      const body = card.querySelector('.body');
-      const more = card.querySelector('.more');
-      if (body && more && body.scrollHeight <= body.clientHeight + 2) more.remove();
-    }
+    grid.innerHTML = '';
+    queue = list.slice();
+    appendChunk();
   }
   document.getElementById('empty').hidden = list.length > 0;
+}
+
+/**
+ * カードは少しずつ足す。
+ *
+ * 800 枚を一度に組むと最初の描画に 1 秒以上かかり、絞り込みのたびに固まる。
+ * 画面に入るのはせいぜい十数枚なので、下端が見えたら次を足す方式にする。
+ * CSV・印刷は絞り込み結果の全件(lastList)を使うので、この分割の影響を受けない。
+ */
+const CHUNK = 60;
+let queue = [];
+
+function appendChunk() {
+  const grid = document.getElementById('grid');
+  const sentinel = document.getElementById('more-sentinel');
+  if (!queue.length) { sentinel.hidden = true; return; }
+
+  const slice = queue.splice(0, CHUNK);
+  const holder = document.createElement('div');
+  holder.innerHTML = slice.map(cardHtml).join('');
+  const cards = [...holder.children];
+  grid.append(...cards);
+
+  // 読みと書きは必ず分ける: scrollHeight の読み取りはレイアウトを強制し、
+  // remove() はそれを無効化する。同じループでやると 1 枚ごとに同期レイアウトが走る。
+  const drop = [];
+  for (const card of cards) {
+    const body = card.querySelector('.body');
+    const more = card.querySelector('.more');
+    if (body && more && body.scrollHeight <= body.clientHeight + 2) drop.push(more);
+  }
+  for (const more of drop) more.remove();
+
+  sentinel.hidden = !queue.length;
 }
 
 let lastList = [];
@@ -914,8 +944,28 @@ function handleMark(ev) {
     if (row && row.dataset.sn === sn) row.outerHTML = marksHtml(sn);
   }
   if (mk.closest('#panel')) return true; // パネル内は再描画しない(メモ入力中に消えると困る)
-  render();
+
+  // 状態で絞り込んでいる時だけは、その項目が一覧から消える/現れるので描き直す。
+  // それ以外は該当の 1 枚だけ差し替える —— 800 枚を毎回組み直すとクリックが 1 秒以上固まる。
+  if (state.markFilter.size || state.buyFilter !== 'all') { render(); return true; }
+  refreshEntry(sn);
   return true;
+}
+
+/** 印が付いた 1 件ぶんだけ、カード/行の見た目を更新する */
+function refreshEntry(sn) {
+  const m = markOf(sn);
+  for (const el of document.querySelectorAll('[data-sn="' + CSS.escape(sn) + '"]')) {
+    if (el.classList.contains('marks')) continue;
+    if (m.s) el.dataset.mark = m.s; else delete el.dataset.mark;
+    if (el.classList.contains('card')) {
+      if (m.b) el.dataset.bought = 'true'; else delete el.dataset.bought;
+    }
+    const row = el.querySelector('.marks');
+    if (row) row.outerHTML = marksHtml(sn);
+    const st = el.querySelector('.st');
+    if (st) st.textContent = (m.s ? MARK_ICON[m.s] : '') + (m.b ? '✓' : '');
+  }
 }
 
 document.getElementById('panel').addEventListener('click', ev => { handleMark(ev); });
@@ -974,6 +1024,11 @@ document.addEventListener('keydown', ev => {
   if (lightbox.classList.contains('on')) { lightbox.classList.remove('on'); return; }
   if (!document.getElementById('panel').hidden) closePanel();
 });
+
+// 下端が近づいたら次のかたまりを足す
+new IntersectionObserver(entries => {
+  if (entries.some(e => e.isIntersecting)) appendChunk();
+}, { rootMargin: '600px' }).observe(document.getElementById('more-sentinel'));
 
 initSeen([...DATA.circles, ...DATA.cosplayers, ...DATA.unclassified]);
 render();
@@ -1056,6 +1111,7 @@ export function renderHtml(dataset: Dataset): string {
   </section>
 
   <div class="grid" id="grid"></div>
+  <div id="more-sentinel" hidden></div>
   <div class="ltable-wrap" id="ltable-wrap" hidden></div>
   <div class="empty" id="empty" hidden>条件に合う項目がありません</div>
 
