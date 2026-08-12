@@ -25,6 +25,8 @@ export interface Media {
     type: 'photo' | 'video' | 'animated_gif';
     /** --embed-media 模式下填入 base64 data URI */
     dataUri?: string;
+    /** --save-media 模式下填入 dist/ からの相対パス */
+    local?: string;
 }
 
 /** 从 GraphQL 响应里抽出来的一条推文, 已剥离 X 的嵌套结构 */

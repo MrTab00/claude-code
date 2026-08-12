@@ -77,7 +77,8 @@ bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chro
 | `bun run parse` | 解析成 `data/dataset.json`，**纯离线，可反复重跑** |
 | `bun run inspect` | 诊断：解析命中率 + 没解析出来的推文原文 |
 | `bun run build` | 生成 `dist/c108.html` |
-| `bun run build --embed-media` | 图片下载后 base64 内联，离线也能看 |
+| `bun run build --save-media` | **图片下载到 `dist/media/`**，HTML 用相对路径引用（推荐） |
+| `bun run build --embed-media` | 图片 base64 内联，保持单文件但体积大 |
 | `bun run demo` | 用内置样例数据出一份 HTML |
 | `bun run test` | 全部自测（不需要联网和账号） |
 
@@ -176,7 +177,7 @@ dist/c108.html         成品
 - **ToS**：自动化访问 X 违反其服务条款。本工具用你自己的账号、低频率（滚动间隔 1.5–3.5 秒随机）、只读公开内容、不构造 API 请求、**不做任何反检测 / 指纹伪装 / 验证码绕过**。风险不为零（账号可能被限速或限制），是否接受由你决定。想更稳就把 `config.ts` 里的 `autoScroll` 设成 `false`，改成你手动滚、脚本静默捕获。
 - **覆盖率不会是 100%**。只能采到搜索结果里出现的推文，X 的搜索本身就有召回限制。这是补充工具，不是权威名录——权威的社团配置数据在官方 Web カタログ。
 - **角色名抽取是模糊匹配**。日文自由文本没有稳定结构：hashtag 靠谱，正文靠猜。低置信度会被标出来，`overrides.json` 是补救路径。
-- **品书图只做预览展示**，不做 OCR，不调用任何付费 API。
+- **品书图只做预览展示**，不做 OCR，不调用任何付费 API。默认直接引用 X 的图片链接；`--save-media` 会把图存到本地，X 那边删了也还在。
 
 ---
 
@@ -188,6 +189,7 @@ bun run test
 
 - `test:booth` — 摊位号的全部写法变体
 - `test:pipeline` — fixture 响应 → 提取 → 分类 → 数据集 → HTML 全链路
+- `test:media` — 本地起假图片服务器，验证图片保存、去重、失败回退
 - `test:collect` — 本地起假的 X 前端，带调试端口拉起真 Chrome，走真实 CDP 验证捕获与落盘
 
 都不需要联网，也不需要 X 账号。`test:collect` 找不到 Chrome 时会自动跳过浏览器部分（可用 `CHROME_PATH` 指定）。

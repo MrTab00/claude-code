@@ -218,11 +218,12 @@ const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]))
 
 const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
 
-const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false, grouped: true };
+const state = { tab: 'circles', q: '', days: new Set(), areas: new Set(), mediaOnly: false, grouped: true, sort: 'space' };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const thumb = m => m.dataUri || (m.url.includes('pbs.twimg.com') ? m.url + '?name=small' : m.url);
-const full  = m => m.dataUri || (m.url.includes('pbs.twimg.com') ? m.url + '?name=large' : m.url);
+// ローカル保存 > 埋め込み > ホットリンク の順。保存してあれば X 側が消えても残る
+const thumb = m => m.local || m.dataUri || (m.url.includes('pbs.twimg.com') ? m.url + '?name=small' : m.url);
+const full  = m => m.local || m.dataUri || (m.url.includes('pbs.twimg.com') ? m.url + '?name=large' : m.url);
 
 /** 一条记录参与搜索的全部文本 */
 function haystack(e) {
@@ -237,6 +238,36 @@ function haystack(e) {
 const entryDays  = e => (e.days && e.days.length ? e.days : [...new Set((e.booths || []).map(b => b.day).filter(Boolean))]);
 
 const uniq = xs => [...new Set(xs)];
+
+const AREA_ORDER = { '東': 0, '西': 1, '南': 2 };
+
+/**
+ * 配置順の並びキー。会場は日程 → 地区 → ホール → ブロック → 番号 の順に歩くので、
+ * 一覧もその順に並んでいないと現地で使えない。配置が無いものは最後に送る。
+ */
+function boothKey(e) {
+  const b = (e.booths || [])[0];
+  if (!b) return [9, 9, 99, 'zz', 99, 'z'];
+  return [
+    b.day ?? 8,
+    AREA_ORDER[b.area] ?? 8,
+    Number(b.hall) || 0,
+    b.block ?? 'zz',
+    b.number ?? 99,
+    b.ab ?? 'z',
+  ];
+}
+
+function bySpace(a, b) {
+  const ka = boothKey(a), kb = boothKey(b);
+  for (let i = 0; i < ka.length; i++) {
+    if (ka[i] < kb[i]) return -1;
+    if (ka[i] > kb[i]) return 1;
+  }
+  return 0;
+}
+
+const byNewest = (a, b) => String(b.createdAt).localeCompare(String(a.createdAt));
 
 /** どの配置がより信頼できるか。本文由来 > 表示名/プロフ由来 > 部分的 > 別ツイートからの借り物 */
 function boothScore(e) {
@@ -359,11 +390,25 @@ function cardHtml(e) {
   '</article>';
 }
 
+/** タブごとの現在の一覧。グループ化の有無で件数そのものが変わる */
+function rowsFor(tab) {
+  return state.grouped ? groupByAccount(DATA[tab]) : DATA[tab];
+}
+
 function render() {
-  const all = state.grouped ? groupByAccount(DATA[state.tab]) : DATA[state.tab];
-  const list = all.filter(matches);
+  const all = rowsFor(state.tab);
+  const list = all.filter(matches).sort(state.sort === 'space' ? bySpace : byNewest);
   document.getElementById('count').textContent =
     list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
+
+  // 見出しとタブの数字もグループ化に追随させる。ここがツイート数のままだと
+  // 一覧の件数と食い違って見える
+  for (const tab of ['circles', 'cosplayers', 'unclassified']) {
+    const n = rowsFor(tab).length;
+    document.querySelector('.tab[data-tab="' + tab + '"] .n').textContent = n;
+    const stat = document.getElementById('stat-' + tab);
+    if (stat) stat.textContent = n;
+  }
   document.getElementById('area-filter').hidden = state.tab !== 'circles';
 
   const grid = document.getElementById('grid');
@@ -404,6 +449,12 @@ document.getElementById('q').addEventListener('input', ev => {
 
 bindToggle(document.getElementById('day-filter'), state.days, true);
 bindToggle(document.getElementById('area-filter'), state.areas, false);
+
+document.getElementById('sort-toggle').addEventListener('click', ev => {
+  state.sort = state.sort === 'space' ? 'newest' : 'space';
+  ev.currentTarget.textContent = state.sort === 'space' ? '配置順' : '新着順';
+  render();
+});
 
 document.getElementById('group-toggle').addEventListener('click', ev => {
   state.grouped = !state.grouped;
@@ -456,9 +507,9 @@ export function renderHtml(dataset: Dataset): string {
     <div class="eyebrow">2026.08.15 – 08.16 · 東京ビッグサイト</div>
     <h1>${event.name} 情報まとめ</h1>
     <div class="summary">
-      <div class="stat"><b>${stats.circles}</b><span>サークル</span></div>
-      <div class="stat"><b>${stats.cosplayers}</b><span>コスプレイヤー</span></div>
-      <div class="stat"><b>${stats.unclassified}</b><span>未分類</span></div>
+      <div class="stat"><b id="stat-circles">${stats.circles}</b><span>サークル</span></div>
+      <div class="stat"><b id="stat-cosplayers">${stats.cosplayers}</b><span>コスプレイヤー</span></div>
+      <div class="stat"><b id="stat-unclassified">${stats.unclassified}</b><span>未分類</span></div>
       <div class="stat"><b>${stats.tweets}</b><span>ツイートから</span></div>
     </div>
     <div class="gen">生成 ${new Date(generatedAt).toLocaleString('ja-JP')}${stats.overridesApplied ? ` · 人工修正 ${stats.overridesApplied} 件適用` : ''}</div>
@@ -479,6 +530,7 @@ export function renderHtml(dataset: Dataset): string {
       <button class="chip" type="button" data-value="南" aria-pressed="false">南</button>
     </div>
     <div class="chips">
+      <button class="chip" type="button" id="sort-toggle" data-sort="space">配置順</button>
       <button class="chip" type="button" id="group-toggle" aria-pressed="true">サークル単位</button>
       <button class="chip" type="button" id="media-only" aria-pressed="false">画像あり</button>
     </div>

@@ -2,14 +2,16 @@
  * data/dataset.json -> dist/c108.html
  *
  *   bun run build                 热链图片, 真正的单文件
- *   bun run build --embed-media   下载缩略图 base64 内联, 离线可看
+ *   bun run build --save-media    图片下载到 dist/media/, HTML 用相对路径引用(推荐)
+ *   bun run build --embed-media   缩略图 base64 内联, 单文件但体积大
  */
 
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import { paths } from '../../config';
-import { embedMedia, renderHtml } from '../render/build-html';
+import { embedMedia, renderHtml, saveMedia } from '../render/build-html';
 import type { Dataset } from '../types';
 
 if (!existsSync(paths.dataset)) {
@@ -18,6 +20,12 @@ if (!existsSync(paths.dataset)) {
 }
 
 const dataset = JSON.parse(await readFile(paths.dataset, 'utf8')) as Dataset;
+
+if (process.argv.includes('--save-media')) {
+    console.log('画像を dist/media/ に保存します...');
+    const { ok, failed } = await saveMedia(dataset, join(paths.dist, 'media'));
+    console.log(`  保存 ${ok} 件${failed ? ` / 失敗 ${failed} 件(ホットリンクのまま)` : ''}`);
+}
 
 if (process.argv.includes('--embed-media')) {
     console.log('画像をダウンロードして埋め込みます...');

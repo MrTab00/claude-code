@@ -13,9 +13,10 @@
         "build": "bun run src/cli/build.ts",
         "all": "bun run collect && bun run parse && bun run build",
         "demo": "bun run src/cli/demo.ts",
-        "test": "bun run test:booth && bun run test:pipeline && bun run test:collect",
+        "test": "bun run test:booth && bun run test:pipeline && bun run test:media && bun run test:collect",
         "test:booth": "bun run src/parse/booth.test.ts",
         "test:pipeline": "bun run src/parse/pipeline.test.ts",
+        "test:media": "bun run src/render/media.test.ts",
         "test:collect": "bun run src/collect/cdp.test.ts"
     }
 }
