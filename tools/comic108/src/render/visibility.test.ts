@@ -163,6 +163,45 @@ try {
     await page.evaluate(`document.getElementById('filter-toggle').click()`);
     await new Promise((r) => setTimeout(r, 250));
     check('押すとチップが出る', await shown('#day-filter'));
+    await page.evaluate(`document.getElementById('filter-toggle').click()`);
+    await new Promise((r) => setTimeout(r, 250));
+
+    /*
+     * スマホでは「ページ」ではなく「アプリ」として組んでいる。
+     * ここが崩れると、地図が見出しに押し下げられ、タブが指の届かない上端に残る。
+     * どれも CSS の重なり順ひとつで静かに壊れるので、実寸で押さえておく。
+     */
+    check('ページ自体はスクロールしない', await page.evaluate<boolean>(
+        'document.documentElement.scrollHeight <= innerHeight + 1'));
+    check('タブバーが画面の下端にある', await page.evaluate<boolean>(`(() => {
+        const r = document.querySelector('.tabs').getBoundingClientRect();
+        return Math.abs(innerHeight - r.bottom) < 2 && r.width >= innerWidth - 1;
+    })()`));
+    check('地図が画面の残りを使い切る', await page.evaluate<boolean>(
+        'document.getElementById("mapscroll").getBoundingClientRect().height > innerHeight * 0.6'));
+    // つまんで拡大したら、その範囲だけスクロールできること
+    check('拡大すると地図をスクロールできる', await page.evaluate<boolean>(`(() => {
+        const s = document.getElementById('mapscroll');
+        applyZoom(2);
+        const ok = s.scrollWidth > s.clientWidth + 4;
+        fitZoom();
+        return ok;
+    })()`));
+
+    // 詳細は下から出るシート。取っ手が見えないと「つまんで下げられる」と分からない
+    await page.evaluate(`openPanel(DATA.circles[0].screenName)`);
+    await new Promise((r) => setTimeout(r, 300));
+    check('詳細は下から出る', await page.evaluate<boolean>(`(() => {
+        const r = document.getElementById('panel').getBoundingClientRect();
+        return Math.abs(innerHeight - r.bottom) < 2 && r.top > 40;
+    })()`));
+    check('シートの取っ手が見える', await shown('#panel .grab'));
+    // 指で押す物が小さいと、歩きながらでは当たらない
+    check('押し所が 44px を下回らない', await page.evaluate<boolean>(`(() => {
+        return ![...document.querySelectorAll('.chip, .tab, .zbtn, .mk, .prow')]
+            .some(e => e.offsetParent && e.getBoundingClientRect().height < 40);
+    })()`));
+    await page.evaluate(`closePanel()`);
 
     await page.close();
     conn.close();

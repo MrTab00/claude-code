@@ -22,53 +22,63 @@ function embedJson(data: unknown): string {
  * 所以暗色令牌要写两遍, 且颜色一律走令牌, 绝不直接写在 media / [data-theme] 块里。
  */
 const DARK_TOKENS = `
-  --paper: #161315;
-  --surface: #1e1a1c;
-  --surface-2: #241f22;
-  --border: #322b2f;
-  --ink: #ede8e9;
-  --muted: #9c9195;
-  --accent: #e58aa8;
-  --accent-ink: #2a1119;
-  --accent-soft: #35202a;
-  --east: #7aa5e8;
-  --east-soft: #1c2740;
-  --west: #5cbfa3;
-  --west-soft: #16302a;
-  --south: #dfa06a;
-  --south-soft: #382718;
-  --flag: #e0a35c;
-  --flag-soft: #322612;
-  --sheet: #1a1719;
-  --island: #322b2f;
-  --shadow: none;
-  --ring: rgba(229,138,168,.45);
+  --paper: #0c1017;
+  --surface: #151b25;
+  --surface-2: #1c2331;
+  --border: #2a3444;
+  --ink: #e9edf4;
+  --muted: #8e9bb0;
+  --accent: #ff5c93;
+  --accent-ink: #24030f;
+  --accent-soft: #33141f;
+  --east: #62a0ff;
+  --east-soft: #14243c;
+  --west: #3ecfae;
+  --west-soft: #0e2f2a;
+  --south: #ffa257;
+  --south-soft: #34220f;
+  --flag: #ffbe5c;
+  --flag-soft: #332612;
+  --sheet: #10161f;
+  --island: #253040;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 26px rgba(0,0,0,.42);
+  --ring: rgba(255,92,147,.5);
+  --scrim: rgba(3,6,11,.66);
 `;
 
 const CSS = `
 :root {
   color-scheme: light dark;
-  --paper: #f8f6f5;
+  --paper: #eef1f7;
   --surface: #ffffff;
-  --surface-2: #fbf9f9;
-  --border: #e6e1df;
-  --ink: #1f1b1c;
-  --muted: #7a7073;
-  --accent: #8a3355;
+  --surface-2: #f4f6fb;
+  --border: #dde2ec;
+  --ink: #121824;
+  --muted: #66718a;
+  --accent: #e11e63;
   --accent-ink: #ffffff;
-  --accent-soft: #f6e9ee;
-  --east: #2a5ca8;
-  --east-soft: #e8eef8;
-  --west: #1f7a5c;
-  --west-soft: #e4f2ec;
-  --south: #b4652a;
-  --south-soft: #f8ece1;
-  --flag: #96590d;
-  --flag-soft: #fbf0dd;
-  --sheet: #f3efec;
-  --island: #ded7d2;
-  --shadow: 0 1px 2px rgba(31,27,28,.05), 0 2px 8px rgba(31,27,28,.04);
-  --ring: rgba(138,51,85,.35);
+  --accent-soft: #ffe6ef;
+  --east: #2563eb;
+  --east-soft: #e5edff;
+  --west: #0d9488;
+  --west-soft: #ddf5f1;
+  --south: #ea580c;
+  --south-soft: #ffece0;
+  --flag: #a35a00;
+  --flag-soft: #fff0dc;
+  --sheet: #dde4ef;
+  --island: #ccd4e2;
+  --shadow: 0 1px 2px rgba(18,24,36,.06), 0 6px 20px rgba(18,24,36,.07);
+  --ring: rgba(225,30,99,.45);
+  --scrim: rgba(12,16,23,.5);
+
+  /* 角の丸み。触る前提なので、指で押す面はどれも丸く大きく取る */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+  /* 指で押せる最小の高さ。ここを下回るボタンは作らない */
+  --tap: 44px;
 
   --sans: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Courier New", monospace;
@@ -92,54 +102,77 @@ body {
   background: var(--paper);
   color: var(--ink);
   font: 15px/1.65 var(--sans);
+  /*
+   * 指で押したときの青いハイライトと、行き過ぎたスクロールの跳ね返りは
+   * 「web ページを見ている」感じを出してしまう。道具として使うので消す。
+   */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
-:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+/* 押す物はどれも押した瞬間に反応させる。300ms の待ちが入るとページに見える */
+button, a, input, select, textarea, summary { touch-action: manipulation; }
+button:active, .chip:active, .tab:active, .prow:active { transform: scale(.97); }
+button, .chip, .tab, .prow { transition: transform .08s ease, background-color .12s ease, color .12s ease, border-color .12s ease; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--r-sm); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 .wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 72px; display: flex; flex-direction: column; gap: 18px; }
 
 /* --- ヘッダ: 概況を明細より先に --- */
-.head { display: flex; flex-direction: column; gap: 10px; }
+.head { display: flex; flex-direction: column; gap: 12px; }
 .eyebrow {
-  font: 600 11px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase;
-  color: var(--accent);
+  display: inline-flex; align-self: flex-start; align-items: center; gap: 7px;
+  font: 700 11px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent);
+  padding: 6px 12px; border-radius: var(--r-pill);
 }
-.head h1 { font-size: 25px; line-height: 1.25; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
-.summary { display: flex; flex-wrap: wrap; gap: 20px; align-items: baseline; }
-.stat { display: flex; align-items: baseline; gap: 6px; }
-.stat b { font: 600 20px/1 var(--mono); font-variant-numeric: tabular-nums; }
-.stat span { font-size: 12.5px; color: var(--muted); }
+.head h1 { font-size: 30px; line-height: 1.2; margin: 0; text-wrap: balance; letter-spacing: -.025em; font-weight: 800; }
+/*
+ * 概況は「文の中の数字」ではなく数字そのものを見せる。会場に着いてから
+ * 見るのは番号と数なので、書体も大きさもそちらに寄せる。
+ */
+.summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.stat {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 9px 14px; border-radius: var(--r-md);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.stat b { font: 700 21px/1.15 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.stat span { font-size: 11.5px; color: var(--muted); letter-spacing: .02em; }
 .gen { font-size: 12px; color: var(--muted); }
 
-/* --- タブ --- */
-.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+/* --- タブ: 下線ではなく、まとまりごと押せる帯にする --- */
+.tabs {
+  display: flex; gap: 4px; flex-wrap: wrap; align-self: flex-start; max-width: 100%;
+  padding: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-pill);
+}
 .tab {
   appearance: none; border: 0; background: none; color: var(--muted);
-  font: 500 14.5px var(--sans); cursor: pointer;
-  padding: 9px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font: 600 14.5px var(--sans); cursor: pointer;
+  padding: 9px 16px; border-radius: var(--r-pill); min-height: 38px;
 }
 .tab:hover { color: var(--ink); }
-.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-.tab .n { font: 600 12px var(--mono); font-variant-numeric: tabular-nums; margin-left: 7px; opacity: .75; }
+.tab[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); box-shadow: var(--shadow); }
+.tab .n { font: 700 12px var(--mono); font-variant-numeric: tabular-nums; margin-left: 7px; opacity: .8; }
 
 /* --- ツールバー --- */
 .toolbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-  padding: 11px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow);
 }
 .toolbar input[type=search] {
-  flex: 1 1 250px; min-width: 0; padding: 8px 12px;
-  font: 14px var(--sans); color: var(--ink);
-  border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2);
+  flex: 1 1 250px; min-width: 0; padding: 10px 14px; min-height: var(--tap);
+  font: 15px var(--sans); color: var(--ink);
+  border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface-2);
 }
 .toolbar input[type=search]::placeholder { color: var(--muted); }
 .chips { display: flex; gap: 5px; flex-wrap: wrap; }
 .chip {
-  appearance: none; padding: 6px 11px; border-radius: 6px;
+  appearance: none; padding: 7px 13px; border-radius: var(--r-pill);
   border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
-  font: 500 13px var(--sans); cursor: pointer;
+  font: 600 13px var(--sans); cursor: pointer;
 }
 .chip:hover { color: var(--ink); }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
@@ -161,13 +194,15 @@ body {
 .mapbar .zoom { display: flex; gap: 6px; align-items: center; }
 .mapbar .zoom span { font: 500 12px var(--mono); color: var(--muted); min-width: 44px; text-align: right; }
 .zbtn {
-  appearance: none; min-width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--surface); color: var(--ink); cursor: pointer; font: 500 17px var(--sans); line-height: 1;
-  touch-action: manipulation;
+  appearance: none; min-width: var(--tap); height: var(--tap); border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink); cursor: pointer; font: 600 19px var(--sans); line-height: 1;
+  box-shadow: var(--shadow); touch-action: manipulation;
 }
-.zbtn.wide { padding: 0 14px; font-size: 13px; }
+.zbtn.wide { padding: 0 16px; font-size: 13px; font-weight: 600; }
 .mapscroll {
-  overflow: auto; background: var(--sheet); border: 1px solid var(--border); border-radius: 12px;
+  overflow: auto; background: var(--sheet); border: 1px solid var(--border); border-radius: var(--r-lg);
+  /* 縮小して余りが出たら中央に置く。左上に貼り付いていると会場が端に寄って見える */
+  display: grid; place-content: safe center;
   -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; overscroll-behavior: contain;
   /* 実際の高さは sizeMapScroll() が画面の残りぶんに合わせる */
   flex: 1; min-height: 300px;
@@ -178,7 +213,7 @@ body {
  * 外側の sizer に「実寸 × 倍率」を持たせて、スクロール範囲を見た目に合わせる。
  */
 /* 縮小して余白が出たときは中央に置く。左に寄っていると会場が端に貼りついて見える */
-.mapsizer { position: relative; margin: 0 auto; }
+.mapsizer { position: relative; margin: auto; }
 /* 会場の見取り図 1 枚ぶん。棟を真上から見た並びのまま置く */
 .mapcanvas {
   --sw: 26px; --sh: 8px;
@@ -317,7 +352,7 @@ body {
   font: 700 13px var(--sans); color: var(--ink);
   position: sticky; top: 0; z-index: 1; background: var(--paper); padding: 6px 0;
 }
-.pgroup .parea { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 5px; background: var(--surface-2); }
+.pgroup .parea { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: var(--r-pill); background: var(--surface-2); }
 .pgroup .parea[data-area="東"] { color: var(--east); background: var(--east-soft); }
 .pgroup .parea[data-area="西"] { color: var(--west); background: var(--west-soft); }
 .pgroup .parea[data-area="南"] { color: var(--south); background: var(--south-soft); }
@@ -329,9 +364,9 @@ body {
  * 押せる高さ(52px)と、配置番号が数字として揃うことを優先する。
  */
 .prow {
-  appearance: none; width: 100%; min-height: 52px; cursor: pointer; text-align: left;
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--ink);
+  appearance: none; width: 100%; min-height: 58px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 11px; padding: 9px 13px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); color: var(--ink);
   font: inherit; touch-action: manipulation;
 }
 .prow:hover { border-color: var(--accent); }
@@ -339,8 +374,8 @@ body {
 .prow .pmark.must { color: var(--accent); }
 .prow .pmark.like { color: var(--accent); opacity: .65; }
 .prow .pspace {
-  font: 600 13.5px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
-  padding: 4px 8px; border-radius: 6px; background: var(--surface-2); flex: none;
+  font: 700 13.5px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 5px 9px; border-radius: var(--r-sm); background: var(--surface-2); flex: none;
 }
 .prow .pspace[data-area="東"] { color: var(--east); background: var(--east-soft); }
 .prow .pspace[data-area="西"] { color: var(--west); background: var(--west-soft); }
@@ -354,20 +389,20 @@ body {
 .grid { display: grid; gap: 13px; grid-template-columns: repeat(auto-fill, minmax(322px, 1fr)); }
 .card {
   position: relative; overflow: hidden;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  padding: 14px 15px 13px 18px; box-shadow: var(--shadow);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 15px 16px 14px 20px; box-shadow: var(--shadow);
   display: flex; flex-direction: column; gap: 9px;
 }
 /* 左の縦帯で地区を示す: 会場で探すとき効くのは地区なので、色は装飾ではなく情報 */
-.card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--border); }
+.card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--border); }
 .card[data-area="東"]::before { background: var(--east); }
 .card[data-area="西"]::before { background: var(--west); }
 .card[data-area="南"]::before { background: var(--south); }
 
 .booth { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .b {
-  font: 600 15.5px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em;
-  padding: 4px 9px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border);
+  font: 700 15.5px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+  padding: 5px 10px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--border);
 }
 /* 色は配置ごとに付ける。1 ツイートで東と南の両方を出す例があるので、カード単位だと嘘になる */
 .b[data-area="東"] { color: var(--east); background: var(--east-soft); border-color: transparent; }
@@ -381,7 +416,7 @@ body {
 .who a:hover { text-decoration: underline; }
 
 .tags { display: flex; gap: 5px; flex-wrap: wrap; }
-.tag { font-size: 12px; padding: 3px 8px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); }
+.tag { font-size: 12px; padding: 4px 10px; border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--border); }
 .tag.series { color: var(--muted); }
 
 .body { font-size: 13.5px; white-space: pre-wrap; word-break: break-word; max-height: 7.4em; overflow: hidden; }
@@ -395,7 +430,7 @@ body {
  */
 .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; }
 .shots img {
-  width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 7px;
+  width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: var(--r-md);
   cursor: zoom-in; background: var(--surface-2); border: 1px solid var(--border);
 }
 .shots.one { display: block; }
@@ -407,13 +442,13 @@ body {
 }
 .foot .src { margin-left: auto; color: var(--accent); text-decoration: none; white-space: nowrap; }
 .foot .src:hover { text-decoration: underline; }
-.flag { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: var(--flag-soft); color: var(--flag); }
+.flag { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: var(--r-pill); background: var(--flag-soft); color: var(--flag); }
 
 #more-sentinel { height: 1px; }
 .empty { text-align: center; color: var(--muted); padding: 64px 16px; font-size: 14px; }
 
 #lightbox {
-  position: fixed; inset: 0; background: rgba(10,8,9,.9); display: none;
+  position: fixed; inset: 0; background: rgba(6,9,14,.92); display: none;
   align-items: center; justify-content: center; z-index: 60; cursor: zoom-out; padding: 24px;
 }
 #lightbox.on { display: flex; }
@@ -422,8 +457,8 @@ body {
 /* --- チェック状態 --- */
 .marks { display: flex; gap: 4px; flex-wrap: wrap; }
 .mk {
-  appearance: none; cursor: pointer; font: 500 12px var(--sans);
-  padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border);
+  appearance: none; cursor: pointer; font: 600 12.5px var(--sans);
+  padding: 6px 12px; border-radius: var(--r-pill); border: 1px solid var(--border);
   background: var(--surface-2); color: var(--muted);
 }
 .mk[aria-pressed="true"][data-mk="must"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
@@ -440,7 +475,7 @@ body {
 .toolbar2 .spacer { flex: 1; }
 
 /* --- 表ビュー --- */
-.ltable-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.ltable-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow); }
 .ltable { border-collapse: collapse; width: 100%; font-size: 13px; }
 .ltable th {
   text-align: left; font: 600 11.5px var(--sans); letter-spacing: .04em; color: var(--muted);
@@ -457,7 +492,7 @@ body {
 .ltable tr[data-mark="skip"] td { opacity: .5; }
 
 /* --- 詳細パネル --- */
-#backdrop { position: fixed; inset: 0; background: rgba(10,8,9,.45); z-index: 40; }
+#backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 40; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 #panel {
   position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw);
   background: var(--surface); border-left: 1px solid var(--border); z-index: 50;
@@ -470,8 +505,8 @@ body {
 }
 #panel h2 { margin: 0; font-size: 17px; padding-right: 28px; }
 #panel .memo {
-  width: 100%; min-height: 64px; resize: vertical; font: 13.5px/1.5 var(--sans);
-  color: var(--ink); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  width: 100%; min-height: 72px; resize: vertical; font: 14px/1.6 var(--sans);
+  color: var(--ink); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
 }
 #panel .memo::placeholder { color: var(--muted); }
 #panel .post { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
@@ -496,68 +531,127 @@ body {
 
 /* 絞り込みの開閉ボタン。狭い画面でだけ出す */
 #filter-toggle { display: none; }
+/* 取っ手(シートをつまんで下げる帯)はスマホ表示だけ。既定では出さない */
+#panel .grab { display: none; }
 
 /* --- 手のひらで使う前提の調整 --- */
+/*
+ * スマホは「ページ」ではなく「アプリ」として組む。
+ *
+ * 会場で片手で使うのが本番。ページとして縦に積むと、主役の地図が上の見出しに
+ * 押し下げられ、タブは指の届かない画面上端に残る。そこで:
+ *   - 画面の高さに固定し、ページ自体はスクロールさせない
+ *   - タブは下端へ(親指の届く範囲)
+ *   - 地図は間を全部使い、端まで広げる。操作は 2 本指のつまみが主
+ *   - 詳細は下から出るシートにして、下へ払うと閉じる
+ */
 @media (max-width: 720px) {
-  /*
-   * 会場で片手で使うのが本番。狭い画面では見出しと絞り込みで画面の半分以上が埋まり、
-   * 主役の地図が下に押し出されていた。上に置くものを削り、畳み、1 行に収める。
-   */
+  html { height: 100%; }
+  body { height: 100%; font-size: 15px; }
+  /* 地図・プランは画面に貼り付ける。一覧タブだけは普通に縦スクロールさせる */
+  body.app { overflow: hidden; overscroll-behavior: none; }
+  body.app .wrap { height: 100dvh; }
+
+  .wrap { padding: 0; gap: 0; max-width: none; display: flex; flex-direction: column; min-height: 100dvh; }
+  .head { padding: 12px 14px 6px; gap: 0; }
   .summary, .gen, .head .eyebrow { display: none; }
+  .head h1 { font-size: 16px; line-height: 1.3; font-weight: 700; }
+
+  /* --- 下端のタブバー --- */
+  /*
+   * 広い画面では丸い帯にまとめたタブだが、下端のバーではそれを解く。
+   * 選んだところを塗り潰すと親指の下が一面の色になってしまうので、
+   * ここでは字の色と上の細い線で示す。
+   */
+  .tabs {
+    order: 99; margin-top: auto; position: sticky; bottom: 0; z-index: 30;
+    align-self: stretch; max-width: none;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border: 0; border-top: 1px solid var(--border); border-radius: 0;
+    background: var(--surface); padding: 0 0 env(safe-area-inset-bottom);
+    box-shadow: 0 -1px 14px rgba(12,16,23,.07);
+  }
+  /* 件数は名前の下に置く。横に並べると「コスプレイヤー」で桁が押し出される */
+  .tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px; min-height: 56px; padding: 9px 4px;
+    font-size: 12px; font-weight: 600; border-radius: 0; white-space: nowrap;
+  }
+  .tab[aria-selected="true"] {
+    background: none; color: var(--accent);
+    box-shadow: inset 0 2.5px 0 var(--accent);
+  }
+  .tab .n { margin-left: 0; font-size: 11px; }
+
+  /* --- 上のツールバー類。畳めるものは畳む --- */
   #filter-toggle { display: inline-flex; align-items: center; }
-  body:not(.filters-open) .toolbar > .chips { display: none; }
-  body:not(.filters-open) .count { display: none; }
-  /* CSV・印刷・持ち出しは当日その場で使うものではない。絞り込みと一緒に畳む */
+  body:not(.filters-open) .toolbar > .chips,
+  body:not(.filters-open) .count,
   body:not(.filters-open) .toolbar2 { display: none; }
-  .toolbar { position: static; }
-
-  .wrap { padding: 10px 10px 32px; gap: 10px; }
-  .grid { grid-template-columns: 1fr; }
-  .head { gap: 0; }
-  .head h1 { font-size: 17px; line-height: 1.35; }
-  .summary { gap: 14px; }
-
-  /*
-   * タブと棟のチップは折り返さず横スクロールにする。
-   * 折り返すと 2 段になって、そのぶんまるごと地図の高さが減る。
-   */
-  .tabs, .bldgbar {
-    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  }
-  .tabs::-webkit-scrollbar, .bldgbar::-webkit-scrollbar { display: none; }
-  .tabs > .tab, .bldgbar > .chip { flex: none; white-space: nowrap; }
-  .bldgbar { padding: 8px 0 2px; }
-
-  /*
-   * 拡大縮小は地図の上に重ねる。1 行を専有させると、そのぶん地図が短くなる。
-   * 右下に置くのは親指の届く位置だから。
-   */
-  .mapwrap { position: relative; }
-  .mapbar { position: absolute; right: 10px; bottom: 10px; z-index: 5; padding: 0; width: auto; }
-  .mapbar .zoom {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 4px; box-shadow: var(--shadow); gap: 4px;
-  }
-  .mapbar .zoom span { display: none; }
-  .zbtn { min-width: 40px; height: 40px; }
-  .zbtn.wide { padding: 0 10px; font-size: 12px; }
-
-  /* 指で押せる大きさにする */
-  .tab { padding: 12px 14px; font-size: 15px; min-height: 46px; }
-  .chip { padding: 10px 13px; font-size: 14px; min-height: 42px; }
-  .mk { padding: 10px 12px; font-size: 13px; min-height: 42px; }
-  .toolbar input[type=search] { min-height: 44px; font-size: 16px; } /* 16px 未満だと iOS が勝手に拡大する */
-  .toolbar { padding: 9px; gap: 7px; }
+  .toolbar { position: static; padding: 8px; gap: 7px; margin: 0 10px; border-radius: var(--r-lg); }
+  .toolbar2 { margin: 0 10px; }
+  /* 16px 未満だと iOS が勝手に拡大する。基準幅は小さくして「絞り込み」と 1 行に収める */
+  .toolbar input[type=search] { flex: 1 1 120px; min-height: 46px; font-size: 16px; }
   .count { margin-left: 0; width: 100%; text-align: right; }
 
-  #panel { width: 100vw; border-left: 0; }
-  #panel .close { width: 44px; height: 44px; font-size: 24px; }
+  /* 棟のチップとタブは折り返さず横スクロール。折り返すとそのぶん地図が短くなる */
+  .bldgbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 8px 10px 4px; }
+  .bldgbar::-webkit-scrollbar { display: none; }
+  .bldgbar > .chip { flex: none; white-space: nowrap; }
+  .chip { padding: 10px 13px; font-size: 14px; min-height: 44px; }
+  .mk { padding: 10px 12px; font-size: 13px; min-height: 44px; }
+
+  /* --- 地図は端まで。操作はつまみが主 --- */
+  .mapwrap { position: relative; flex: 1; min-height: 0; }
+  body.app .mapscroll { height: 100%; flex: 1; }
+  /*
+   * プランでは主役は一覧。地図に画面いっぱい使わせると一覧がタブバーの下に隠れ、
+   * 「印を付けた店を順に見る」という本来の使い方ができない。
+   */
+  body.app.tab-plan .mapwrap { flex: none; height: 34dvh; }
+  body.app.tab-plan .planwrap { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .mapscroll { border-left: 0; border-right: 0; border-radius: 0; }
+  .mapbar { position: absolute; right: 10px; bottom: 12px; z-index: 5; padding: 0; width: auto; }
   .mapbar .note { display: none; }
-  /* プランの見出しは指で押す行より小さく。行そのものは 52px を保つ */
-  .pgroup > h3 { font-size: 12.5px; }
-  .prow { padding: 8px 10px; gap: 8px; }
-  .prow .pspace { font-size: 13px; padding: 4px 7px; }
+  .mapbar .zoom {
+    flex-direction: column; gap: 2px; padding: 4px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
+    box-shadow: 0 2px 6px rgba(12,16,23,.1), 0 10px 28px rgba(12,16,23,.14);
+  }
+  .mapbar .zoom span { display: none; }
+  .zbtn { min-width: 44px; height: 44px; border: 0; box-shadow: none; }
+  .zbtn.wide { font-size: 11px; height: 44px; padding: 0; }
+
+  /* --- 詳細は下から出るシート --- */
+  #panel {
+    top: auto; left: 0; right: 0; bottom: 0; width: 100%;
+    height: min(86dvh, 720px); border-left: 0; border-top: 1px solid var(--border);
+    border-radius: 24px 24px 0 0; padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 44px rgba(12,16,23,.22);
+    touch-action: pan-y;
+  }
+  /* つまんで下げるための取っ手。押せる場所がここだと目で分かるようにする */
+  #panel .grab {
+    display: block; width: 44px; height: 5px; border-radius: var(--r-pill); background: var(--border);
+    margin: 3px auto 10px; flex: none;
+  }
+  #panel .close { top: 6px; right: 10px; width: 44px; height: 44px; font-size: 22px; }
+  #panel h2 { font-size: 18px; }
+
+  /* --- 一覧 --- */
+  .grid { grid-template-columns: 1fr; padding: 0 10px; }
+  .planwrap { padding: 0 10px 16px; }
   .ltable th, .ltable td { padding: 10px 8px; }
+  .pgroup > h3 { font-size: 12.5px; background: var(--paper); }
+  .card { border-radius: var(--r-md); }
+  .prow { padding: 10px; gap: 8px; min-height: 56px; }
+  .prow .pspace { font-size: 13px; padding: 4px 7px; }
+  /*
+   * 断り書きは一覧タブに常に出ている。地図・プランは画面に貼り付けているので、
+   * ここに置くとそのぶん地図が短くなるだけ。アプリ表示のときだけ外す。
+   */
+  body.app .site-note { display: none; }
+  .site-note { padding: 0 12px 12px; }
 }
 `;
 
@@ -1068,8 +1162,20 @@ function applyZoom(z) {
  * 見出しと絞り込みの下に固定の高さで置くと、地図の中とページの両方がスクロールして
  * どちらを動かしているのか分からなくなる。残りいっぱいまで伸ばして外側は動かさない。
  */
+const isPhoneApp = () => document.body.classList.contains('app') && matchMedia('(max-width: 720px)').matches;
+
 function sizeMapScroll() {
   const scroll = document.getElementById('mapscroll');
+  /*
+   * スマホでは画面に貼り付けたアプリとして組んであり、余りの高さは flex が決める。
+   * ここで height を入れると下のタブバーぶんを二重に数えて、地図が上の棟チップに
+   * かぶってしまう。CSS に任せる。
+   */
+  if (isPhoneApp()) {
+    scroll.style.flex = '';
+    scroll.style.height = '';
+    return;
+  }
   const top = scroll.getBoundingClientRect().top + window.scrollY;
   const rest = Math.max(300, window.innerHeight - top - 16);
   // flex: 1 のままだと height を無視されるので、こちらで決めると宣言してから入れる
@@ -1174,6 +1280,11 @@ function render() {
   const base = all.filter(matches);
   const list = base.sort(state.sort === 'space' ? bySpace : byNewest);
   lastList = list;
+
+  // 地図とプランは画面に貼り付けたアプリとして見せる。一覧は普通に縦スクロールさせる
+  document.body.classList.toggle('app', onMap || onPlan);
+  // プランは地図を低く、一覧を主役にする。高さの配分は CSS 側で決める
+  document.body.classList.toggle('tab-plan', onPlan);
 
   renderMap(base);
   renderPlan(onPlan ? list : []);
@@ -1557,17 +1668,65 @@ mapScroll.addEventListener('touchmove', ev => {
 
 mapScroll.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; }, { passive: true });
 
-// 素早く 2 回叩いたら拡大、拡大済みなら全体へ戻す
+/**
+ * 素早く 2 回叩いたら拡大、拡大済みなら全体へ戻す。
+ * 叩いた場所を中心に寄せる —— そうしないと拡大した先が画面外で、
+ * 見たかった場所を探し直すことになる。
+ */
 let lastTap = 0;
+let lastTapAt = { x: 0, y: 0 };
 mapScroll.addEventListener('touchend', ev => {
   if (ev.touches.length || pinch) return;
+  const t = ev.changedTouches[0];
   const now = Date.now();
-  if (now - lastTap < 300) {
-    if (ev.target.closest('.sp')) return; // スペースを開く操作を邪魔しない
-    zoom > 1 ? fitZoom() : applyZoom(1.8);
+  const near = t && Math.hypot(t.clientX - lastTapAt.x, t.clientY - lastTapAt.y) < 40;
+  if (now - lastTap < 300 && near) {
+    if (ev.target.closest('.sp') || ev.target.closest('.cb')) return; // マスを開く操作を邪魔しない
+    if (zoom > 1) { fitZoom(); return; }
+    const box = mapScroll.getBoundingClientRect();
+    // 叩いた点が中身のどこかを今の倍率で求めてから、拡大後にその点を画面の中央へ
+    const cx = (mapScroll.scrollLeft + t.clientX - box.left) / zoom;
+    const cy = (mapScroll.scrollTop + t.clientY - box.top) / zoom;
+    applyZoom(1.8);
+    mapScroll.scrollLeft = cx * zoom - box.width / 2;
+    mapScroll.scrollTop = cy * zoom - box.height / 2;
   }
   lastTap = now;
+  if (t) lastTapAt = { x: t.clientX, y: t.clientY };
 }, { passive: true });
+
+/**
+ * 詳細シートはつまんで下へ払うと閉じる。
+ * 画面の下から出るものは下へ払って閉じるのが当たり前になっているので、
+ * ✕ を探さずに済む。中身を縦に読んでいる途中は掴まない(一番上にいるときだけ)。
+ */
+(() => {
+  const panel = document.getElementById('panel');
+  let start = null;
+  panel.addEventListener('touchstart', ev => {
+    if (ev.touches.length !== 1) { start = null; return; }
+    // 取っ手からなら常に、本文からは一番上まで戻っているときだけ掴む
+    const onGrab = ev.target.closest('.grab') || panel.scrollTop <= 0;
+    start = onGrab ? { y: ev.touches[0].clientY, t: Date.now() } : null;
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', ev => {
+    if (!start || ev.touches.length !== 1) return;
+    const dy = ev.touches[0].clientY - start.y;
+    if (dy <= 0) { panel.style.transform = ''; return; }
+    panel.style.transform = 'translateY(' + dy + 'px)';
+  }, { passive: true });
+
+  panel.addEventListener('touchend', ev => {
+    if (!start) return;
+    const dy = (ev.changedTouches[0] || {}).clientY - start.y;
+    const quick = Date.now() - start.t < 300;
+    panel.style.transform = '';
+    // 大きく下げたか、素早く払ったら閉じる
+    if (dy > panel.offsetHeight * 0.3 || (quick && dy > 70)) closePanel();
+    start = null;
+  }, { passive: true });
+})();
 
 // プランの行を押したらそのサークルの詳細を開く
 document.getElementById('planwrap').addEventListener('click', ev => {
@@ -1745,6 +1904,7 @@ export function renderHtml(dataset: Dataset): string {
 </div>
 
 <aside id="panel" hidden>
+  <span class="grab" aria-hidden="true"></span>
   <button class="close" type="button" aria-label="閉じる">✕</button>
   <div id="panel-body"></div>
 </aside>
