@@ -111,10 +111,28 @@ bun run parse && bun run build
 bun run deploy
 ```
 
-公开地址是 `https://c108-map.pages.dev`。想换名字就改 `C108_PAGES_PROJECT` 环境变量：
+公开地址是 `https://c108-map.pages.dev`。想换名字就改环境变量：
 
 ```bash
 C108_PAGES_PROJECT=c108-tokyo bun run deploy
+```
+
+### 「Nothing is here yet」
+
+打开 `<项目>.pages.dev` 看到这句，说明**项目在、但还没有 production 部署**——上传的内容进了 preview。
+
+`wrangler pages deploy` 不指定 `--branch` 时会拿 git 当前分支名当分支；只要它跟项目设定的 production branch 不一致，就算 preview。在功能分支上开发时必然对不上。
+
+`bun run deploy` 已经固定传 `--branch main`，跟你在哪个分支上工作无关。项目建的时候如果用了别的 production branch，用环境变量对齐：
+
+```bash
+C108_PAGES_BRANCH=production bun run deploy
+```
+
+查当前有哪些部署、分别属于 Production 还是 Preview：
+
+```bash
+npx wrangler pages deployment list --project-name c108-map
 ```
 
 ### `deploy` 做了什么

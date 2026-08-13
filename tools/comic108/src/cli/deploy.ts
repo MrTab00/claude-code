@@ -22,6 +22,16 @@ const dry = process.argv.includes('--dry-run');
 /** wrangler の Pages プロジェクト名。公開 URL は https://<これ>.pages.dev */
 const PROJECT = process.env.C108_PAGES_PROJECT ?? 'c108-map';
 
+/*
+ * 本番として上げるブランチ名。
+ *
+ * --branch を渡さないと wrangler は git の現在のブランチ名を使う。それが
+ * プロジェクトの production branch と違うと preview 扱いになり、上げたつもりでも
+ * <プロジェクト>.pages.dev は「Nothing is here yet」のままになる。
+ * ここで作業ブランチと切り離しておく。
+ */
+const BRANCH = process.env.C108_PAGES_BRANCH ?? 'main';
+
 if (!existsSync(built)) {
     console.error('dist/c108.html が無い。先に bun run build を実行してください。');
     process.exit(1);
@@ -94,9 +104,10 @@ if (dry) {
  * wrangler は npx 経由で呼ぶ。初回は `npx wrangler login` でブラウザ認証が要る。
  * CI から回すときは CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID を環境変数で渡す。
  */
-console.log(`\nCloudflare Pages へ公開します (プロジェクト: ${PROJECT})`);
+console.log(`\nCloudflare Pages へ公開します (プロジェクト: ${PROJECT} / ブランチ: ${BRANCH})`);
 const proc = Bun.spawn(
-    ['npx', '--yes', 'wrangler@latest', 'pages', 'deploy', site, '--project-name', PROJECT, '--commit-dirty=true'],
+    ['npx', '--yes', 'wrangler@latest', 'pages', 'deploy', site,
+     '--project-name', PROJECT, '--branch', BRANCH, '--commit-dirty=true'],
     { stdout: 'inherit', stderr: 'inherit', stdin: 'inherit', cwd: root },
 );
 const code = await proc.exited;
@@ -104,10 +115,17 @@ if (code !== 0) {
     console.error(
         '\n公開に失敗しました。よくある原因:\n' +
         '  1. 未ログイン        → npx wrangler login\n' +
-        `  2. プロジェクトが無い → npx wrangler pages project create ${PROJECT} --production-branch main\n` +
+        `  2. プロジェクトが無い → npx wrangler pages project create ${PROJECT} --production-branch ${BRANCH}\n` +
         '  3. Node が古い       → wrangler は Node 18 以上が要ります',
     );
     process.exit(code);
 }
+/*
+ * 本番のブランチ名がプロジェクト側の設定と食い違うと、成功と表示されたまま preview に
+ * 入る。<プロジェクト>.pages.dev を開いて「Nothing is here yet」が出るのがこの状態。
+ */
 console.log(`\n公開しました: https://${PROJECT}.pages.dev`);
+console.log(`  本番として上げたブランチ: ${BRANCH}`);
+console.log(`  反映されない場合は、プロジェクトの production branch がこの名前か確かめてください:`);
+console.log(`    npx wrangler pages deployment list --project-name ${PROJECT}`);
 console.log(`イベント: ${event.name}`);
