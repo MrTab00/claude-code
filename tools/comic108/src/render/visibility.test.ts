@@ -92,6 +92,38 @@ try {
     await new Promise((r) => setTimeout(r, 200));
     check('拡大時はサークル名を出す', (await page.evaluate<string>('document.getElementById("mapcanvas").dataset.detail')) === '2');
 
+    /*
+     * プラン: 印を付けたサークルだけを、当日まわる順(日 → 地区 → 配置)に並べる。
+     * 地図も同じ絞り込みで描くので、印を付けたマスだけが残る = それが強調表示になる。
+     */
+    await page.evaluate(`document.querySelector('.tab[data-tab="plan"]').click()`);
+    await new Promise((r) => setTimeout(r, 300));
+    check('印が無いうちは空の案内を出す', await shown('#planwrap'));
+    check('印が無ければ行は無い', (await page.evaluate<number>('document.querySelectorAll(".prow").length')) === 0);
+
+    await page.evaluate(`(() => {
+        const withBooth = groupByAccount(DATA.circles).filter(e => (e.booths || []).some(b => official(b)));
+        store.marks[withBooth[0].screenName] = { s: 'must' };
+        if (withBooth[1]) store.marks[withBooth[1].screenName] = { s: 'like' };
+        store.marks[withBooth[withBooth.length - 1].screenName] = { s: 'skip' };
+        saveStore();
+        render();
+    })()`);
+    await new Promise((r) => setTimeout(r, 300));
+    const planned = await page.evaluate<number>('document.querySelectorAll(".prow").length');
+    check('★と♡だけが並ぶ(⊖見送りは入れない)', planned === 2, planned);
+    check('タブの数字が一致する', (await page.evaluate<string>('document.getElementById("plan-n").textContent')) === '2');
+    // 地図に残るマスが印の数と一致していれば、それが強調表示になっている
+    check('地図には印を付けたマスだけが残る',
+        (await page.evaluate<number>('document.querySelectorAll("#mapcanvas .sp").length')) === 2);
+    check('プランでも地図は出したまま', await shown('#mapwrap'));
+
+    await page.evaluate(`document.querySelector('.prow').click()`);
+    await new Promise((r) => setTimeout(r, 300));
+    check('プランの行を押すと詳細が開く', await shown('#panel'));
+    await page.evaluate(`document.querySelector('#panel .close').click()`);
+    await new Promise((r) => setTimeout(r, 200));
+
     // 一覧はタブを移ってから
     await page.evaluate(`document.querySelector('.tab[data-tab="circles"]').click()`);
     await new Promise((r) => setTimeout(r, 250));

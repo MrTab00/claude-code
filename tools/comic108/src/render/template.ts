@@ -303,7 +303,54 @@ body {
 .mapcanvas[data-detail="1"] .sp .nm { display: none; }
 .mapcanvas[data-detail="1"] .sp { font-size: 6.5px; }
 
-/* --- カード --- *//* --- カード --- */
+/* --- プラン: 印を付けたサークルを当日まわる順に --- */
+.planwrap { display: flex; flex-direction: column; gap: 18px; }
+.plansum { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.plansum .pill { font: 700 13px var(--sans); padding: 5px 11px; border-radius: 999px; }
+.plansum .pill.must { background: var(--accent); color: var(--accent-ink); }
+.plansum .pill.like { background: var(--accent-soft); color: var(--accent); }
+.plansum .pnote { font-size: 12px; color: var(--muted); }
+
+.pgroup { display: flex; flex-direction: column; gap: 6px; }
+.pgroup > h3 {
+  margin: 0; display: flex; align-items: center; gap: 8px;
+  font: 700 13px var(--sans); color: var(--ink);
+  position: sticky; top: 0; z-index: 1; background: var(--paper); padding: 6px 0;
+}
+.pgroup .parea { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 5px; background: var(--surface-2); }
+.pgroup .parea[data-area="東"] { color: var(--east); background: var(--east-soft); }
+.pgroup .parea[data-area="西"] { color: var(--west); background: var(--west-soft); }
+.pgroup .parea[data-area="南"] { color: var(--south); background: var(--south-soft); }
+.pgroup .pn { margin-left: auto; font: 500 12px var(--mono); color: var(--muted); }
+
+.plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+/*
+ * 1 行 = 1 サークル。会場では歩きながら片手で見るので、
+ * 押せる高さ(52px)と、配置番号が数字として揃うことを優先する。
+ */
+.prow {
+  appearance: none; width: 100%; min-height: 52px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--ink);
+  font: inherit; touch-action: manipulation;
+}
+.prow:hover { border-color: var(--accent); }
+.prow .pmark { font-size: 15px; line-height: 1; flex: none; width: 18px; text-align: center; }
+.prow .pmark.must { color: var(--accent); }
+.prow .pmark.like { color: var(--accent); opacity: .65; }
+.prow .pspace {
+  font: 600 13.5px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 4px 8px; border-radius: 6px; background: var(--surface-2); flex: none;
+}
+.prow .pspace[data-area="東"] { color: var(--east); background: var(--east-soft); }
+.prow .pspace[data-area="西"] { color: var(--west); background: var(--west-soft); }
+.prow .pspace[data-area="南"] { color: var(--south); background: var(--south-soft); }
+.prow .pname { flex: 1; min-width: 0; font-size: 14px; display: flex; flex-direction: column; gap: 2px; }
+.prow .pmemo { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .pdone { flex: none; font: 700 11px var(--sans); color: var(--west); }
+.planwrap .empty { text-align: center; color: var(--muted); padding: 48px 16px; font-size: 14px; line-height: 1.9; }
+
+/* --- カード --- */
 .grid { display: grid; gap: 13px; grid-template-columns: repeat(auto-fill, minmax(322px, 1fr)); }
 .card {
   position: relative; overflow: hidden;
@@ -453,19 +500,47 @@ body {
 /* --- 手のひらで使う前提の調整 --- */
 @media (max-width: 720px) {
   /*
-   * 狭い画面ではチップが何段にも折り返して、地図が画面外まで押し下げられていた。
-   * 見出しの数字はタブにも出ているので省き、絞り込みは畳んで、まず地図を見せる。
+   * 会場で片手で使うのが本番。狭い画面では見出しと絞り込みで画面の半分以上が埋まり、
+   * 主役の地図が下に押し出されていた。上に置くものを削り、畳み、1 行に収める。
    */
-  .summary, .gen { display: none; }
+  .summary, .gen, .head .eyebrow { display: none; }
   #filter-toggle { display: inline-flex; align-items: center; }
   body:not(.filters-open) .toolbar > .chips { display: none; }
   body:not(.filters-open) .count { display: none; }
+  /* CSV・印刷・持ち出しは当日その場で使うものではない。絞り込みと一緒に畳む */
+  body:not(.filters-open) .toolbar2 { display: none; }
   .toolbar { position: static; }
 
-  .wrap { padding: 12px 10px 40px; gap: 12px; }
+  .wrap { padding: 10px 10px 32px; gap: 10px; }
   .grid { grid-template-columns: 1fr; }
-  .head h1 { font-size: 20px; }
+  .head { gap: 0; }
+  .head h1 { font-size: 17px; line-height: 1.35; }
   .summary { gap: 14px; }
+
+  /*
+   * タブと棟のチップは折り返さず横スクロールにする。
+   * 折り返すと 2 段になって、そのぶんまるごと地図の高さが減る。
+   */
+  .tabs, .bldgbar {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .tabs::-webkit-scrollbar, .bldgbar::-webkit-scrollbar { display: none; }
+  .tabs > .tab, .bldgbar > .chip { flex: none; white-space: nowrap; }
+  .bldgbar { padding: 8px 0 2px; }
+
+  /*
+   * 拡大縮小は地図の上に重ねる。1 行を専有させると、そのぶん地図が短くなる。
+   * 右下に置くのは親指の届く位置だから。
+   */
+  .mapwrap { position: relative; }
+  .mapbar { position: absolute; right: 10px; bottom: 10px; z-index: 5; padding: 0; width: auto; }
+  .mapbar .zoom {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 4px; box-shadow: var(--shadow); gap: 4px;
+  }
+  .mapbar .zoom span { display: none; }
+  .zbtn { min-width: 40px; height: 40px; }
+  .zbtn.wide { padding: 0 10px; font-size: 12px; }
 
   /* 指で押せる大きさにする */
   .tab { padding: 12px 14px; font-size: 15px; min-height: 46px; }
@@ -477,9 +552,11 @@ body {
 
   #panel { width: 100vw; border-left: 0; }
   #panel .close { width: 44px; height: 44px; font-size: 24px; }
-  .mapscroll { min-height: 66vh; }
-  .mapbar { padding: 6px 0 8px; }
   .mapbar .note { display: none; }
+  /* プランの見出しは指で押す行より小さく。行そのものは 52px を保つ */
+  .pgroup > h3 { font-size: 12.5px; }
+  .prow { padding: 8px 10px; gap: 8px; }
+  .prow .pspace { font-size: 13px; padding: 4px 7px; }
   .ltable th, .ltable td { padding: 10px 8px; }
 }
 `;
@@ -526,6 +603,9 @@ const store = (() => {
 })();
 function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch {} }
 const markOf = sn => store.marks[sn] || {};
+/** ★絶対 と ♡気になる。当日まわるのはこの 2 つ */
+const PLANNED = new Set(['must', 'like']);
+const isPlanned = sn => PLANNED.has(markOf(sn).s);
 function setMark(sn, patch) {
   store.marks[sn] = Object.assign({}, store.marks[sn], patch);
   const m = store.marks[sn];
@@ -752,6 +832,8 @@ function rowHtml(e) {
 
 /** 現在の一覧。グループ化の有無で件数そのものが変わる */
 function rowsFor(kind) {
+  // プランは「印を付けたサークルだけ」。並びも当日まわる順(配置順)で固定する
+  if (kind === 'plan') return groupByAccount(DATA.circles).filter(e => isPlanned(e.screenName));
   return state.grouped ? groupByAccount(DATA[kind]) : DATA[kind];
 }
 
@@ -920,7 +1002,7 @@ function hallHtml(area, hall, spaces) {
 
 function renderMap(rows) {
   const wrap = document.getElementById('mapwrap');
-  if (state.tab !== 'map') { wrap.hidden = true; return; }
+  if (state.tab !== 'map' && state.tab !== 'plan') { wrap.hidden = true; return; }
   wrap.hidden = false;
 
   const { spaces, strays } = buildSpaceIndex(rows);
@@ -989,9 +1071,14 @@ function applyZoom(z) {
 function sizeMapScroll() {
   const scroll = document.getElementById('mapscroll');
   const top = scroll.getBoundingClientRect().top + window.scrollY;
+  const rest = Math.max(300, window.innerHeight - top - 16);
   // flex: 1 のままだと height を無視されるので、こちらで決めると宣言してから入れる
   scroll.style.flex = 'none';
-  scroll.style.height = Math.max(300, window.innerHeight - top - 16) + 'px';
+  /*
+   * プランでは主役は一覧のほう。地図に画面いっぱい使わせると一覧が折り返しの下に隠れ、
+   * 「印を付けた店を順に見る」という本来の使い方ができない。地図は俯瞰として低く置く。
+   */
+  scroll.style.height = (state.tab === 'plan' ? Math.min(rest, Math.round(window.innerHeight * 0.34)) : rest) + 'px';
 }
 
 /** 会場が丸ごと収まる倍率にして左上へ戻す。縦も入れないと南まで見えない */
@@ -1015,8 +1102,73 @@ function fitZoom() {
   scroll.scrollTo(0, 0);
 }
 
+/**
+ * プラン: 印を付けたサークルを当日まわる順に並べる。
+ *
+ * 日 → 地区 → 配置順。会場では日をまたがず、地区もまたがず、
+ * ブロック順に歩くので、その順に並んでいないと現地で使えない。
+ */
+function renderPlan(rows) {
+  const wrap = document.getElementById('planwrap');
+  if (state.tab !== 'plan') { wrap.hidden = true; return; }
+  wrap.hidden = false;
+
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="empty">まだ印がありません。<br>' +
+      'サークル一覧や地図でカードを開いて <b>★絶対</b> か <b>♡気になる</b> を付けると、ここに並びます。</div>';
+    return;
+  }
+
+  // 日 → 地区 → 配置。日の分からないものは最後にまとめる
+  const buckets = new Map();
+  for (const e of rows) {
+    const b = (e.booths || []).find(x => official(x)) || (e.booths || [])[0];
+    const o = b ? official(b) : null;
+    const day = (e.days && e.days.length === 1) ? e.days[0] : (b && b.day) || 0;
+    const area = o ? o.area : '—';
+    const key = day + '/' + area;
+    if (!buckets.has(key)) buckets.set(key, { day, area, items: [] });
+    buckets.get(key).items.push({ e, b, o });
+  }
+
+  const order = { '東': 0, '西': 1, '南': 2, '—': 3 };
+  const groups = [...buckets.values()].sort((a, b) =>
+    (a.day || 9) - (b.day || 9) || order[a.area] - order[b.area]);
+
+  const counts = { must: 0, like: 0 };
+  for (const e of rows) counts[markOf(e.screenName).s] = (counts[markOf(e.screenName).s] || 0) + 1;
+
+  let html = '<div class="plansum">' +
+    '<span class="pill must">★ ' + counts.must + '</span>' +
+    '<span class="pill like">♡ ' + counts.like + '</span>' +
+    '<span class="pnote">' + rows.length + ' サークル · 地図はこの印だけを表示しています</span></div>';
+
+  for (const g of groups) {
+    g.items.sort((x, y) => bySpace(x.e, y.e));
+    html += '<section class="pgroup"><h3>' +
+      (g.day ? esc(DAY_LABEL[g.day] || g.day + '日目') : '日程不明') +
+      '<span class="parea" data-area="' + esc(g.area) + '">' + esc(g.area === '—' ? '配置不明' : g.area + '地区') + '</span>' +
+      '<span class="pn">' + g.items.length + '</span></h3><ul class="plist">';
+    for (const { e, b, o } of g.items) {
+      const m = markOf(e.screenName);
+      html += '<li><button class="prow" type="button" data-sn="' + esc(e.screenName) + '">' +
+        '<span class="pmark ' + esc(m.s) + '">' + (m.s === 'must' ? '★' : '♡') + '</span>' +
+        '<span class="pspace"' + (o ? ' data-area="' + esc(o.area) + '"' : '') + '>' +
+          esc(b ? b.display.replace(/^\d日目\s*/, '') : '配置不明') + '</span>' +
+        '<span class="pname">' + esc(e.circleName || e.displayName) +
+          (m.m ? '<span class="pmemo">' + esc(m.m) + '</span>' : '') + '</span>' +
+        (m.b ? '<span class="pdone">済</span>' : '') +
+        '</button></li>';
+    }
+    html += '</ul></section>';
+  }
+  wrap.innerHTML = html;
+}
+
 function render() {
   const onMap = state.tab === 'map';
+  const onPlan = state.tab === 'plan';
+  // 地図タブはサークルを描く。プランタブは印を付けたものだけ
   const kind = onMap ? 'circles' : state.tab;
   const all = rowsFor(kind);
   const base = all.filter(matches);
@@ -1024,6 +1176,8 @@ function render() {
   lastList = list;
 
   renderMap(base);
+  renderPlan(onPlan ? list : []);
+  document.getElementById('plan-n').textContent = rowsFor('plan').length;
   document.getElementById('count').textContent =
     list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
 
@@ -1035,15 +1189,15 @@ function render() {
     if (stat) stat.textContent = n;
   }
   // 地区で絞れるのはサークルだけ。地図タブでは常に出す
-  document.getElementById('area-filter').hidden = !onMap && state.tab !== 'circles';
-  document.querySelector('.viewpick').hidden = onMap;
+  document.getElementById('area-filter').hidden = !onMap && !onPlan && state.tab !== 'circles';
+  document.querySelector('.viewpick').hidden = onMap || onPlan;
   // CSV・印刷・持ち出しは一覧のための道具。地図では場所を取るだけなので隠す
   document.querySelector('.toolbar2').hidden = onMap;
 
   const grid = document.getElementById('grid');
   const twrap = document.getElementById('ltable-wrap');
 
-  if (onMap) {
+  if (onMap || onPlan) {
     grid.hidden = true;
     twrap.hidden = true;
     document.getElementById('empty').hidden = true;
@@ -1207,7 +1361,7 @@ document.querySelector('.tabs').addEventListener('click', ev => {
   state.tab = tab.dataset.tab;
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-selected', String(t === tab));
   render();
-  if (state.tab === 'map') fitZoom();
+  if (state.tab === 'map' || state.tab === 'plan') fitZoom();
 });
 
 document.getElementById('filter-toggle').addEventListener('click', ev => {
@@ -1415,6 +1569,12 @@ mapScroll.addEventListener('touchend', ev => {
   lastTap = now;
 }, { passive: true });
 
+// プランの行を押したらそのサークルの詳細を開く
+document.getElementById('planwrap').addEventListener('click', ev => {
+  const row = ev.target.closest('.prow');
+  if (row) openPanel(row.dataset.sn);
+});
+
 // 棟の絞り込み。押した棟だけを描き直し、全体に収める
 document.getElementById('bldgbar').addEventListener('click', ev => {
   const btn = ev.target.closest('.chip');
@@ -1470,9 +1630,9 @@ render();
 fitZoom();
 // フォントが差し替わると地図の実寸が数 px 変わる。落ち着いてからもう一度測って合わせ直す
 if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(() => { if (state.tab === 'map') fitZoom(); });
+  document.fonts.ready.then(() => { if (state.tab === 'map' || state.tab === 'plan') fitZoom(); });
 }
-addEventListener('resize', () => { if (state.tab === 'map') fitZoom(); });
+addEventListener('resize', () => { if (state.tab === 'map' || state.tab === 'plan') fitZoom(); });
 `;
 
 export function renderHtml(dataset: Dataset): string {
@@ -1508,6 +1668,7 @@ export function renderHtml(dataset: Dataset): string {
 
   <nav class="tabs" role="tablist">
     <button class="tab" type="button" role="tab" data-tab="map" aria-selected="true">地図</button>
+    <button class="tab" type="button" role="tab" data-tab="plan" aria-selected="false">プラン<span class="n" id="plan-n">0</span></button>
     <button class="tab" type="button" role="tab" data-tab="circles" aria-selected="false">サークル<span class="n">${stats.circles}</span></button>
     <button class="tab" type="button" role="tab" data-tab="cosplayers" aria-selected="false">コスプレイヤー<span class="n">${stats.cosplayers}</span></button>
   </nav>
@@ -1565,6 +1726,8 @@ export function renderHtml(dataset: Dataset): string {
     </div>
     <div class="mapscroll" id="mapscroll"><div class="mapsizer" id="mapsizer"><div class="mapcanvas" id="mapcanvas" data-detail="1"></div></div></div>
   </div>
+
+  <div class="planwrap" id="planwrap" hidden></div>
 
   <div class="grid" id="grid"></div>
   <div id="more-sentinel" hidden></div>

@@ -180,6 +180,12 @@ check('棟の並びが会場どおり',
 check('西1・西2 が 1 棟になっている', /"id":"西","area":"西","halls":\[\{"hall":"1"[\s\S]*?\{"hall":"2"/.test(html));
 check('棟の外枠と中の仕切りがある', /\.bldg\s*\{[^}]*border:\s*2px/.test(html) && html.includes('.bhalls > .mhall + .mhall'));
 check('棟で絞り込むチップがある', html.includes('data-bldg="東123"') && html.includes('data-bldg="南"'));
+// プラン: 印を付けたサークルを当日まわる順に並べるタブ
+check('プランのタブと置き場所がある',
+    html.includes('data-tab="plan"') && html.includes('id="planwrap"') && html.includes('id="plan-n"'));
+check('プランは ★絶対 と ♡気になる だけ', /PLANNED = new Set\(\['must', 'like'\]\)/.test(html));
+// 会場では日をまたがず地区もまたがずに歩く。その順で並んでいないと現地で使えない
+check('プランは日 → 地区 → 配置の順', html.includes('.pgroup') && html.includes('bySpace(x.e, y.e)'));
 // 企業ブースは西・南の 4F。ブロック記号が無く番号だけなので別の作りで描く
 check('企業ブースの棟がある', html.includes('data-bldg="企業西"') && html.includes('data-bldg="企業南"'));
 check('企業ブースの番号と出展社名が埋まっている',
