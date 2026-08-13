@@ -7,7 +7,7 @@
  */
 
 import type { Dataset } from '../types';
-import { FLOOR, buildBlockLookup, buildHallLookup, buildingIds } from './venue';
+import { FLOOR, buildBlockLookup, buildHallLookup, buildingIds, companyNames } from './venue';
 
 /** JSON 内嵌进 <script> 时必须把 < 转义掉, 否则 "</script>" 会提前闭合标签 */
 function embedJson(data: unknown): string {
@@ -233,7 +233,7 @@ body {
  * 番号は飛び飛び(1111 の次が 1121)なので連番のマスは作らず、実在する番号だけ置く。
  */
 /* 伸ばさない。親が縦に広いと、マスがその高さいっぱいまで引き伸ばされてしまう */
-.cgroups { --cbw: calc(var(--sw) * 1.15); display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+.cgroups { --cbw: calc(var(--sw) * 3.4); display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
 .cgroup { display: flex; flex-direction: column; gap: 3px; }
 .cgroup > .glabel { font: 700 9px var(--sans); color: var(--muted); }
 /* 配置図の企業ブースは横長。折り返しを狭くすると縦に伸びて全体表示が小さくなる */
@@ -244,18 +244,20 @@ body {
 .cbooths {
   display: grid; gap: 3px; align-content: start; justify-content: start;
   grid-template-columns: repeat(auto-fill, var(--cbw));
-  width: calc((var(--cbw) + 3px) * 12);
+  width: calc((var(--cbw) + 3px) * 5);
 }
 .cb {
   appearance: none; border: 1px solid var(--border); border-radius: 2px; padding: 1px 3px; margin: 0;
   /* align-self を明示しないと grid の行いっぱいに引き伸ばされ、縦長の箱になる */
-  align-self: start; width: var(--cbw); height: calc(var(--sh) * 2); overflow: hidden;
+  align-self: start; width: var(--cbw); height: calc(var(--sh) * 3.4); overflow: hidden;
   background: var(--island); color: var(--muted); cursor: pointer;
   font: 600 7px/1.25 var(--sans); display: flex; flex-direction: column; align-items: flex-start;
   touch-action: manipulation;
 }
 .cb.vacant { cursor: default; }
-.cb .nm { display: none; white-space: nowrap; }
+.cb .num { font-variant-numeric: tabular-nums; opacity: .7; }
+/* 出展社名は既定で出す。長いものは 2 行まで見せて、あとは切る */
+.cb .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .cb:not(.vacant) { background: var(--west-soft); color: var(--west); border-color: var(--west); }
 .cb:not(.vacant)[data-area="南"] { background: var(--south-soft); color: var(--south); border-color: var(--south); }
 .cb[data-mark="must"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -263,9 +265,10 @@ body {
 .cb[data-mark="skip"] { opacity: .35; }
 /* 拡大したらサークル名も出す。縮小時は番号すら読めないので枠だけ */
 .mapcanvas[data-detail="2"] .cb .nm { display: block; }
-.mapcanvas[data-detail="2"] .cgroups { --cbw: calc(var(--sw) * 2.6); }
-.mapcanvas[data-detail="2"] .cb { height: calc(var(--sh) * 3.2); }
+/* 出展社名は等倍でも読める。縮小しきったときだけ番号も消して枠だけにする */
+.mapcanvas[data-detail="0"] .cgroups { --cbw: calc(var(--sw) * 1.2); }
 .mapcanvas[data-detail="0"] .cb { font-size: 0; padding: 0; height: var(--sh); }
+.mapcanvas[data-detail="0"] .cb .nm { display: none; }
 /*
  * 島は 2 列。空きスペースは背景の線で描くので要素を作らない ——
  * 800 サークル規模で 6000 個の空マスを置くと重すぎる。
@@ -489,6 +492,8 @@ const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '�
 
 // 公式配置図から起こしたホール構成と、ブロック→ホールの逆引き
 const FLOOR = __FLOOR__;
+// 企業ブースの番号 → 出展社名。企業ブースパンフレットから
+const COMPANY_OF = __COMPANY_OF__;
 const HALL_OF = __HALL_OF__;
 const BLOCK_OF = __BLOCK_OF__;
 
@@ -865,16 +870,20 @@ function islandHtml(area, hallNo, island, slots, letterAfter, spaces, isWall) {
  */
 function companyHallHtml(area, hall, spaces) {
   const groups = hall.groups.map(g => {
-    const cells = g.booths.map(n => {
-      const at = spaces.get('C/' + area + '/' + hall.hall + '/' + n);
-      if (!at || !at.length) return '<span class="cb vacant">' + n + '</span>';
-      const names = at.map(e => e.circleName || e.displayName);
+    const cells = g.booths.map(b => {
+      // 出展社名はパンフレットから分かっている。ツイートが無くても必ず出す ——
+      // 「どこが何のブースか」が分からなければ地図の意味がない
+      const at = spaces.get('C/' + area + '/' + hall.hall + '/' + b.no);
+      const label = '<span class="num">' + b.no + '</span><span class="nm">' + esc(b.name) + '</span>';
+      const where = area + hall.hall + ' ' + b.no + '  ' + b.name;
+      if (!at || !at.length) return '<span class="cb vacant" title="' + esc(where) + '">' + label + '</span>';
+      // ツイートが採れているブースは押すと詳細が開く
+      const posts = at.map(e => e.circleName || e.displayName);
       const mark = markOf(at[0].screenName).s;
       return '<button class="cb" type="button" data-area="' + esc(area) + '"' +
         (mark ? ' data-mark="' + mark + '"' : '') +
         ' data-sn="' + esc(at[0].screenName) + '"' +
-        ' title="' + esc(area + hall.hall + ' ' + n + '  ' + names.join(' / ')) + '">' +
-        '<span class="num">' + n + '</span><span class="nm">' + esc(names.join('/')) + '</span></button>';
+        ' title="' + esc(where + '  —  ' + posts.join(' / ')) + '">' + label + '</button>';
     }).join('');
     return '<div class="cgroup">' + (g.label ? '<span class="glabel">' + esc(g.label) + '</span>' : '') +
       '<div class="cbooths">' + cells + '</div></div>';
@@ -988,14 +997,21 @@ function sizeMapScroll() {
 /** 会場が丸ごと収まる倍率にして左上へ戻す。縦も入れないと南まで見えない */
 function fitZoom() {
   sizeMapScroll();
-  measureCanvas();
   const scroll = document.getElementById('mapscroll');
   const pad = 4;
-  const byW = natural.w ? (scroll.clientWidth - pad) / natural.w : 1;
-  const byH = natural.h ? (scroll.clientHeight - pad) / natural.h : 1;
-  // 「全体」は縮めるためのもの。小さい棟だけを出したときに引き伸ばすと、
-  // マスばかり大きくなって一度に見える範囲がかえって狭くなる
-  applyZoom(Math.min(1, byW, byH));
+  /*
+   * 倍率によって細かさ(= 企業ブースのマスの大きさや文字の有無)が変わり、
+   * 細かさが変わると実寸も変わる。1 回測って合わせただけでは、合わせた結果の
+   * レイアウトに対しては合っていない。2 回まわして落ち着かせる。
+   */
+  for (let pass = 0; pass < 2; pass++) {
+    measureCanvas();
+    const byW = natural.w ? (scroll.clientWidth - pad) / natural.w : 1;
+    const byH = natural.h ? (scroll.clientHeight - pad) / natural.h : 1;
+    // 「全体」は縮めるためのもの。小さい棟だけを出したときに引き伸ばすと、
+    // マスばかり大きくなって一度に見える範囲がかえって狭くなる
+    applyZoom(Math.min(1, byW, byH));
+  }
   scroll.scrollTo(0, 0);
 }
 
@@ -1575,7 +1591,7 @@ export function renderHtml(dataset: Dataset): string {
 <div id="lightbox"><img alt=""></div>
 
 <script type="application/json" id="c108-data">${embedJson(dataset)}</script>
-<script>${JS.replace('__FLOOR__', JSON.stringify(FLOOR)).replace('__HALL_OF__', JSON.stringify(buildHallLookup())).replace('__BLOCK_OF__', JSON.stringify(buildBlockLookup()))}</script>
+<script>${JS.replace('__FLOOR__', JSON.stringify(FLOOR)).replace('__COMPANY_OF__', JSON.stringify(companyNames())).replace('__HALL_OF__', JSON.stringify(buildHallLookup())).replace('__BLOCK_OF__', JSON.stringify(buildBlockLookup()))}</script>
 </body>
 </html>
 `;

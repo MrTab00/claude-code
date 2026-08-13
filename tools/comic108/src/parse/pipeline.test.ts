@@ -182,7 +182,9 @@ check('棟の外枠と中の仕切りがある', /\.bldg\s*\{[^}]*border:\s*2px/
 check('棟で絞り込むチップがある', html.includes('data-bldg="東123"') && html.includes('data-bldg="南"'));
 // 企業ブースは西・南の 4F。ブロック記号が無く番号だけなので別の作りで描く
 check('企業ブースの棟がある', html.includes('data-bldg="企業西"') && html.includes('data-bldg="企業南"'));
-check('企業ブースの番号が埋まっている', /"booths":\[111,112,121,122,911,912,913,914\]/.test(html));
+check('企業ブースの番号と出展社名が埋まっている',
+    /"no":111,"name":"トロンプルイユ/.test(html) && /"no":2213,"name":"株式会社山善"/.test(html));
+check('番号 → 出展社名の表がある', /"1222":"メロンブックス"/.test(html));
 check('空きマスの class が既存の .empty と衝突していない',
     html.includes('cb vacant') && !/class="cb empty"/.test(html));
 check('ブロック→ホールの逆引きが入っている', /"東\/ア":"1"/.test(html));

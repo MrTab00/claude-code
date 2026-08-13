@@ -18,7 +18,7 @@ import { join } from 'node:path';
 
 import type { RawCapture } from '../types';
 import { attachCapture, autoScroll, clampToToday, defaultRange, halveWindow, matchOperation, splitRange, windowDays, windowQuery } from './cdp';
-import { companyBooths, companyHallOf } from '../render/venue';
+import { companyBooths, companyHallOf, companyNames } from '../render/venue';
 import { connectCdp, openPage } from './cdp-client';
 
 const CHROME_CANDIDATES = [
@@ -107,9 +107,17 @@ if (!chromePath) {
 {
     const all = companyBooths();
     check('企業ブースは 122 社', all.length === 122, all.length);
-    check('番号の重複が無い', new Set(all).size === all.length);
+    check('番号の重複が無い', new Set(all.map((b) => b.no)).size === all.length);
+    check('名前の空欄が無い', all.every((b) => b.name.trim().length > 0), all.filter((b) => !b.name.trim()));
     check('1xxx は西 / 2xxx は南',
-        all.every((n) => (String(n).length === 4 ? companyHallOf(n)?.area === (String(n)[0] === '1' ? '西' : '南') : true)));
+        all.every(({ no }) =>
+            String(no).length === 4 ? companyHallOf(no)?.area === (String(no)[0] === '1' ? '西' : '南') : true));
+    // パンフレットの地図と 50 音さくいんの両方から読める組み合わせで抜き取り確認
+    const name = companyNames();
+    check('番号と出展社名の対応', name[1111] === 'Yostar' && name[1222] === 'メロンブックス' &&
+        name[2213] === '株式会社山善' && name[2531] === 'GEE!STORE' && name[2534] === '二次元コスパ' &&
+        name[1933] === 'ぶりきやさん（仮）' && name[2621] === '勝利の女神：NIKKE',
+        [name[1111], name[1222], name[2213], name[2531], name[2534], name[1933], name[2621]]);
     check('ガールズエリアは南3', [111, 112, 121, 122, 911, 912, 913, 914]
         .every((n) => companyHallOf(n)?.area === '南' && companyHallOf(n)?.hall === '3'));
     check('14xx は西4', companyHallOf(1411)?.hall === '4' && companyHallOf(1451)?.hall === '4');
@@ -331,9 +339,17 @@ try {
 {
     const all = companyBooths();
     check('企業ブースは 122 社', all.length === 122, all.length);
-    check('番号の重複が無い', new Set(all).size === all.length);
+    check('番号の重複が無い', new Set(all.map((b) => b.no)).size === all.length);
+    check('名前の空欄が無い', all.every((b) => b.name.trim().length > 0), all.filter((b) => !b.name.trim()));
     check('1xxx は西 / 2xxx は南',
-        all.every((n) => (String(n).length === 4 ? companyHallOf(n)?.area === (String(n)[0] === '1' ? '西' : '南') : true)));
+        all.every(({ no }) =>
+            String(no).length === 4 ? companyHallOf(no)?.area === (String(no)[0] === '1' ? '西' : '南') : true));
+    // パンフレットの地図と 50 音さくいんの両方から読める組み合わせで抜き取り確認
+    const name = companyNames();
+    check('番号と出展社名の対応', name[1111] === 'Yostar' && name[1222] === 'メロンブックス' &&
+        name[2213] === '株式会社山善' && name[2531] === 'GEE!STORE' && name[2534] === '二次元コスパ' &&
+        name[1933] === 'ぶりきやさん（仮）' && name[2621] === '勝利の女神：NIKKE',
+        [name[1111], name[1222], name[2213], name[2531], name[2534], name[1933], name[2621]]);
     check('ガールズエリアは南3', [111, 112, 121, 122, 911, 912, 913, 914]
         .every((n) => companyHallOf(n)?.area === '南' && companyHallOf(n)?.hall === '3'));
     check('14xx は西4', companyHallOf(1411)?.hall === '4' && companyHallOf(1451)?.hall === '4');

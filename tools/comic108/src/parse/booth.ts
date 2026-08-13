@@ -16,7 +16,7 @@ import type { AB, Area, Booth, Confidence, Day } from '../types';
  * 「2026年」「108」のような数字はいくらでも出てくるので、
  * 構成表に載っている番号だけを企業ブースと認める。
  */
-const COMPANY_BOOTHS = new Set(companyBooths());
+const COMPANY_BOOTHS = new Set(companyBooths().map((b) => b.no));
 
 /** 片假名 ア-ヺ */
 const KATAKANA = '\\u30A1-\\u30FA';

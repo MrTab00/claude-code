@@ -58,10 +58,16 @@ export interface Hall {
  *   1 桁目 1=西 / 2=南、2 桁目が島、3 桁目が列、4 桁目がその中の位置。
  * 島の形までは配置図から起こしていないので、番号のまとまりごとに並べるだけにしてある。
  */
+/** 企業ブース 1 つ。no が場所、name が出展社名 */
+export interface CompanyBooth {
+    no: number;
+    name: string;
+}
+
 export interface CompanyHall {
     hall: string;
-    /** 通路で分かれたまとまり。番号は企業ブースパンフレットの地図の並びそのまま */
-    groups: { label?: string; booths: number[] }[];
+    /** 通路で分かれたまとまり。並びは企業ブースパンフレットの地図のまま */
+    groups: { label?: string; booths: CompanyBooth[] }[];
 }
 
 /** 1 棟。中の仕切りがホール。地図の絞り込みもこの単位 */
@@ -217,35 +223,172 @@ const south2: Hall = {
 const west3: CompanyHall = {
     hall: '3',
     groups: [
-        { booths: [1111, 1121, 1122, 1123, 1124, 1125, 1131, 1132, 1133, 1134, 1141, 1142, 1151, 1161, 1171] },
-        { booths: [1211, 1221, 1222, 1223, 1224, 1225, 1226, 1231, 1232, 1233, 1241, 1251, 1252] },
-        { booths: [1311, 1312, 1313, 1321, 1322, 1323, 1331, 1332, 1333, 1341, 1342, 1343, 1351] },
-        { booths: [1911, 1912, 1913, 1914, 1921, 1922, 1923, 1931, 1932, 1933, 1934, 1941, 1942, 1943] },
+        { booths: [
+            { no: 1111, name: 'Yostar' },
+            { no: 1121, name: 'TOYPLA' },
+            { no: 1122, name: 'sprite×ゲーマーズ出張店' },
+            { no: 1123, name: 'アリスソフト' },
+            { no: 1124, name: 'でぼの巣製作所／Studio e・go！' },
+            { no: 1125, name: 'ぱれっと with CLEARRAVE' },
+            { no: 1131, name: 'ケロQ&枕' },
+            { no: 1132, name: 'ネクストン' },
+            { no: 1133, name: 'きゃらON！' },
+            { no: 1134, name: 'キズナリンク' },
+            { no: 1141, name: 'みるくふぁくとりー' },
+            { no: 1142, name: '対魔忍' },
+            { no: 1151, name: 'トリッカル・もちもちほっぺ大作戦' },
+            { no: 1161, name: 'KADOKAWA' },
+            { no: 1171, name: '戦姫絶唱シンフォギア' },
+        ] },
+        { booths: [
+            { no: 1211, name: 'アズールプロミリア' },
+            { no: 1221, name: 'テクロノス クロスドリィミア出張所／テクロス' },
+            { no: 1222, name: 'メロンブックス' },
+            { no: 1223, name: 'Whirlpool' },
+            { no: 1224, name: 'Whirlpoolを送る会 by オルトロス' },
+            { no: 1225, name: 'きゃべつそふと' },
+            { no: 1226, name: 'まどそふと' },
+            { no: 1231, name: 'コミケ消臭ゲート＜臭いのは君じゃない、服だ！＞' },
+            { no: 1232, name: 'シーズナルプランツ' },
+            { no: 1233, name: 'カーテン魂' },
+            { no: 1241, name: 'FANZA夏の陣 FANZA同人VS FANZA動画' },
+            { no: 1251, name: 'AMNIBUS' },
+            { no: 1252, name: 'PikattoAnime／ピカットアニメ' },
+        ] },
+        { booths: [
+            { no: 1311, name: 'ユーフォーテーブル' },
+            { no: 1312, name: 'ライザのアトリエASMR' },
+            { no: 1313, name: 'ガストショップ&KT SPOT出張所〜コーエーテクモゲームス〜' },
+            { no: 1321, name: 'ぬいぐるみメーカー Gift&あみあみ' },
+            { no: 1322, name: 'グッドスマイルカンパニー' },
+            { no: 1323, name: 'DOLK' },
+            { no: 1331, name: 'TERBIS' },
+            { no: 1332, name: 'スタジオEMBERS' },
+            { no: 1333, name: 'あいりすミスティリア！／オーガスト' },
+            { no: 1341, name: 'アニクロ' },
+            { no: 1342, name: 'ロックアイス®／小久保製氷冷蔵株式会社' },
+            { no: 1343, name: 'フロンティアワークス' },
+            { no: 1351, name: 'ピクシブ' },
+        ] },
+        { booths: [
+            { no: 1911, name: 'あにぽん' },
+            { no: 1912, name: '株式会社日創クリエイティブ' },
+            { no: 1913, name: 'レカンザ' },
+            { no: 1914, name: 'クロノア' },
+            { no: 1921, name: 'ナンバーナイン' },
+            { no: 1922, name: 'アニメスタイル' },
+            { no: 1923, name: '株式会社ゴンゾ' },
+            { no: 1931, name: 'BAKECO' },
+            { no: 1932, name: 'ねこのて推し活部' },
+            { no: 1933, name: 'ぶりきやさん（仮）' },
+            { no: 1934, name: 'POSUTAYA×すのこタン。' },
+            { no: 1941, name: 'M\'s marche' },
+            { no: 1942, name: 'Chillweeb' },
+            { no: 1943, name: 'きゃらめる -CharaMerci-' },
+        ] },
     ],
 };
 
 const west4: CompanyHall = {
     hall: '4',
-    groups: [{ booths: [1411, 1412, 1413, 1414, 1421, 1422, 1423, 1424, 1431, 1432, 1433, 1441, 1442, 1443, 1451] }],
+    groups: [
+        { booths: [
+            { no: 1411, name: 'アクアプラス' },
+            { no: 1412, name: 'とらのあな' },
+            { no: 1413, name: 'GRANTdesign' },
+            { no: 1414, name: 'まんがタイムきららさまーふぇすてぃばる in MEDICOS 2026' },
+            { no: 1421, name: 'ふもコレ' },
+            { no: 1422, name: '中外鉱業' },
+            { no: 1423, name: '郵便局ブース' },
+            { no: 1424, name: 'firestorage' },
+            { no: 1431, name: 'ボートレース多摩川' },
+            { no: 1432, name: 'Aiming チームキャラバン' },
+            { no: 1433, name: 'PSA Japan' },
+            { no: 1441, name: 'サミー株式会社「スマスロ リコリス・リコイル」' },
+            { no: 1442, name: '＃推し汗には金のファブリーズ' },
+            { no: 1443, name: '5pb.Craft' },
+            { no: 1451, name: 'IRIAM COOL COOL COOL' },
+        ] },
+    ],
 };
 
 const south3: CompanyHall = {
     hall: '3',
     groups: [
-        { label: 'ガールズエリア', booths: [111, 112, 121, 122, 911, 912, 913, 914] },
-        { booths: [2141, 2142, 2143] },
-        { booths: [2211, 2212, 2213, 2221, 2222, 2223, 2231, 2241] },
-        { booths: [2311, 2321, 2322, 2323, 2324, 2331, 2341, 2342, 2343] },
-        { booths: [2911, 2912, 2913, 2921, 2922] },
+        { label: 'ガールズエリア', booths: [
+            { no: 111, name: 'トロンプルイユ なりたいあの子になれるコスプレレンズ' },
+            { no: 112, name: '株式会社タピオカ' },
+            { no: 121, name: 'らぶカル' },
+            { no: 122, name: 'BBSHOP' },
+            { no: 911, name: 'しあわせの珈琲・紅茶 TEE HAUS MOZART' },
+            { no: 912, name: 'KOS' },
+            { no: 913, name: 'アイシングクッキー工房LEAP' },
+            { no: 914, name: 'サクラフルーツパレット' },
+        ] },
+        { booths: [
+            { no: 2141, name: 'わかさ生活' },
+            { no: 2142, name: 'ハッピーハッピーメロンパン秘密基地' },
+            { no: 2143, name: 'みつばちのーと' },
+        ] },
+        { booths: [
+            { no: 2211, name: '秋田書店' },
+            { no: 2212, name: 'TOブックス' },
+            { no: 2213, name: '株式会社山善' },
+            { no: 2221, name: '『俺だけレベルアップな件 展』' },
+            { no: 2222, name: '株式会社ReStart' },
+            { no: 2223, name: 'PACIFIC RACING TEAM×ウマ娘 プリティーダービーコラボブース' },
+            { no: 2231, name: 'HRC ホンダ・レーシング' },
+            { no: 2241, name: 'HONEY∞PARADE GAMES' },
+        ] },
+        { booths: [
+            { no: 2311, name: 'バンドリ！・フロムトーキョーブース' },
+            { no: 2321, name: '報知エンターテインメントマーケット' },
+            { no: 2322, name: 'エンターグラム' },
+            { no: 2323, name: 'アップランド' },
+            { no: 2324, name: 'ハコネクト' },
+            { no: 2331, name: 'Canva' },
+            { no: 2341, name: 'バーチャル・ステーション（JR西日本グループ）' },
+            { no: 2342, name: 'THEキャラ' },
+            { no: 2343, name: '地獄のどこが悪い？ -What in “HELL” is bad？-' },
+        ] },
+        { booths: [
+            { no: 2911, name: '焼き菓子ASHLEY' },
+            { no: 2912, name: '群馬電機 呼び込み君' },
+            { no: 2913, name: 'スポニチ' },
+            { no: 2921, name: '知多娘。' },
+            { no: 2922, name: '上関町公式VTuber「のんのちゃん」' },
+        ] },
     ],
 };
 
 const south4: CompanyHall = {
     hall: '4',
     groups: [
-        { booths: [2411, 2421, 2431, 2441, 2442, 2443, 2444, 2445, 2446] },
-        { booths: [2511, 2521, 2522, 2531, 2532, 2533, 2534, 2541] },
-        { booths: [2621, 2641] },
+        { booths: [
+            { no: 2411, name: 'ホロライブプロダクション' },
+            { no: 2421, name: 'アストラエ・オラティオ' },
+            { no: 2431, name: 'ハムハムパンパン in 夏コミ' },
+            { no: 2441, name: 'eeo Store × 竹書房STORE' },
+            { no: 2442, name: 'aniplus' },
+            { no: 2443, name: 'フォーカス' },
+            { no: 2444, name: 'Pアニメストア' },
+            { no: 2445, name: '京町セイカ@精華町' },
+            { no: 2446, name: 'ナスペック「音」で休憩コーナー' },
+        ] },
+        { booths: [
+            { no: 2511, name: 'HoYoverse' },
+            { no: 2521, name: 'TYPE-MOON' },
+            { no: 2522, name: 'アニプレックス' },
+            { no: 2531, name: 'GEE!STORE' },
+            { no: 2532, name: 'バーテックスフォース' },
+            { no: 2533, name: 'アリス・ギア・アイギス' },
+            { no: 2534, name: '二次元コスパ' },
+            { no: 2541, name: '土屋工業（株）' },
+        ] },
+        { booths: [
+            { no: 2621, name: '勝利の女神：NIKKE' },
+            { no: 2641, name: 'ブラウンダスト2' },
+        ] },
     ],
 };
 
@@ -276,18 +419,23 @@ export function companyHallOf(num: number): { area: Area; hall: string } | null 
     for (const row of FLOOR) {
         for (const b of row.buildings) {
             for (const h of b.companies ?? []) {
-                if (h.groups.some((g) => g.booths.includes(num))) return { area: b.area, hall: h.hall };
+                if (h.groups.some((g) => g.booths.some((x) => x.no === num))) return { area: b.area, hall: h.hall };
             }
         }
     }
     return null;
 }
 
-/** 企業ブースの番号すべて。本文の数字を配置と取り違えないための照合に使う */
-export function companyBooths(): number[] {
+/** 企業ブースすべて。本文の数字を配置と取り違えないための照合と、名前の表示に使う */
+export function companyBooths(): CompanyBooth[] {
     return FLOOR.flatMap((row) =>
         row.buildings.flatMap((b) => (b.companies ?? []).flatMap((h) => h.groups.flatMap((g) => g.booths))),
     );
+}
+
+/** 番号 → 出展社名 */
+export function companyNames(): Record<number, string> {
+    return Object.fromEntries(companyBooths().map((b) => [b.no, b.name]));
 }
 
 /** 地図の絞り込みチップに出す棟の並び */
