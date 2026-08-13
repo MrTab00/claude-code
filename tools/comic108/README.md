@@ -82,9 +82,53 @@ bun run collect --no-launch    # 不自动启动，连接你已经开好的 Chro
 | `bun run build --save-media` | **图片下载到 `dist/media/`**，HTML 用相对路径引用（推荐） |
 | `bun run build --embed-media` | 图片 base64 内联，保持单文件但体积大 |
 | `bun run demo` | 用内置样例数据出一份 HTML |
+| `bun run deploy` | 发布到 Cloudflare Pages（见下） |
+| `bun run deploy --dry-run` | 只组 `dist/site/`，不上传 |
 | `bun run test` | 全部自测（不需要联网和账号） |
 
 原始响应落盘后，解析可以离线重跑任意次。**调正则不需要重新采集。**
+
+---
+
+## 公开发布（Cloudflare Pages）
+
+产出就是一个 HTML 文件，所以托管只需要一个静态站点。选 Cloudflare Pages 的理由是**流量不限量且免费**——コミケ当天（8/15–16）访问会集中在两天里，Firebase Hosting 的 360 MB/天在这个场景下偏紧。
+
+### 第一次
+
+```bash
+# 1. 登录（会开浏览器）
+npx wrangler login
+
+# 2. 建项目（只要做一次）
+npx wrangler pages project create c108-map --production-branch main
+```
+
+### 每次更新
+
+```bash
+bun run parse && bun run build
+bun run deploy
+```
+
+公开地址是 `https://c108-map.pages.dev`。想换名字就改 `C108_PAGES_PROJECT` 环境变量：
+
+```bash
+C108_PAGES_PROJECT=c108-tokyo bun run deploy
+```
+
+### `deploy` 做了什么
+
+1. **拦住假数据**——`dist/` 里同时有 `c108-demo.html` 这类样例产物，正式产物里如果还留着 `circle_0` 这种生成的账号名，直接报错退出。一旦公开就会被搜索引擎收录，所以在上传前拦。要强行上传得显式加 `--allow-test-data`。
+2. 把 `dist/c108.html` 复制成 `dist/site/index.html`——**只有这一个文件会被公开**，demo 和 Artifact 版留在 `dist/` 里不上传。
+3. 写 `_headers`：`Cache-Control: max-age=0, must-revalidate`。整个页面是一个文件，改一次全变，缓存久了当天的订正推不出去；`must-revalidate` 让浏览器每次问一句，没变就走 304，实际不产生传输。
+4. 写 `robots.txt`。
+
+### 自有域名
+
+`.pages.dev` 够用就不用买。要绑自有域名的话，在 Cloudflare Dashboard → Pages → 该项目 → Custom domains 里加，DNS 一指、证书自动签，不用改代码也不用重新部署。
+
+**Google Domains 已在 2023 年卖给 Squarespace，现在不存在了。** 按成本价卖域名的是 Cloudflare Registrar（`.com` 约 $10/年，不加价）。
 
 ---
 

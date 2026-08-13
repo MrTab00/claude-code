@@ -9,6 +9,11 @@
 import type { Dataset } from '../types';
 import { FLOOR, buildBlockLookup, buildHallLookup, buildingIds, companyNames } from './venue';
 
+/** 属性値に入れる文字列。クォートが混ざると属性がそこで切れる */
+function attr(s: string): string {
+    return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+}
+
 /** JSON 内嵌进 <script> 时必须把 < 转义掉, 否则 "</script>" 会提前闭合标签 */
 function embedJson(data: unknown): string {
     return JSON.stringify(data).replace(/</g, '\\u003c');
@@ -1901,12 +1906,26 @@ export function renderHtml(dataset: Dataset): string {
         .map((id) => `<button class="chip" type="button" data-bldg="${id}" aria-pressed="false">${id}</button>`)
         .join('');
 
+    // 共有されたときに出る一文。中身が分かる数字を入れておく
+    const desc = `X の投稿から集めた ${stats.circles} サークル・${stats.cosplayers} コスプレイヤーの配置を、` +
+        `会場の見取り図から探せる非公式のまとめ。`;
+
     return `<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  viewport-fit=cover は、下端のタブバーを画面の端まで届かせるため。
+  はみ出したぶんは env(safe-area-inset-bottom) で内側に戻している。
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${event.name} 情報まとめ</title>
+<meta name="description" content="${attr(desc)}">
+<!-- X や LINE に貼られたときに何のページか分かるように。画像は持たないので文字だけ -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="${attr(event.name)} 情報まとめ (非公式)">
+<meta property="og:description" content="${attr(desc)}">
+<meta name="twitter:card" content="summary">
 <style>${CSS}</style>
 </head>
 <body>

@@ -13,6 +13,7 @@
         "build": "bun run src/cli/build.ts",
         "all": "bun run collect && bun run parse && bun run build",
         "demo": "bun run src/cli/demo.ts",
+        "deploy": "bun run src/cli/deploy.ts",
         "test": "bun run test:booth && bun run test:pipeline && bun run test:media && bun run test:visibility && bun run test:collect",
         "test:booth": "bun run src/parse/booth.test.ts",
         "test:pipeline": "bun run src/parse/pipeline.test.ts",
