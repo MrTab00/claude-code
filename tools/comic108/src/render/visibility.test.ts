@@ -188,6 +188,37 @@ try {
         return ok;
     })()`));
 
+    /*
+     * 拡大したときの余白。会場の実寸ちょうどしかスクロールできないと、上端の島は
+     * 浮かせた検索欄の下に入ったまま出せない —— 上にはもう何も無いので指が空を切る。
+     */
+    check('全体表示では余白を付けない', await page.evaluate<boolean>(
+        '(fitZoom(), gutter.x === 0 && gutter.y === 0 && Math.abs(document.getElementById("mapscroll").scrollLeft) < 3)'));
+    check('拡大すると会場の外側に余白が付く', await page.evaluate<boolean>(
+        '(applyZoom(2), gutter.x > 100 && gutter.y > 100)'));
+    check('上端を画面の下半分まで引き下ろせる', await page.evaluate<boolean>(`(() => {
+        const s = document.getElementById('mapscroll');
+        s.scrollTop = 0;
+        const top = document.getElementById('mapcanvas').getBoundingClientRect().top - s.getBoundingClientRect().top;
+        return top >= s.clientHeight / 2 - 2;
+    })()`));
+    check('右端を画面の左半分まで寄せられる', await page.evaluate<boolean>(`(() => {
+        const s = document.getElementById('mapscroll');
+        s.scrollLeft = s.scrollWidth;
+        const right = document.getElementById('mapcanvas').getBoundingClientRect().right - s.getBoundingClientRect().left;
+        return right <= s.clientWidth / 2 + 2;
+    })()`));
+    // 拡大縮小は画面の中央を軸にする。ずれると見ていた場所を探し直すことになる
+    check('拡大して戻すと同じ場所が中央', await page.evaluate<boolean>(`(() => {
+        fitZoom();
+        const before = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+        zoomAt(zoom * 1.4);
+        zoomAt(zoom / 1.4);
+        const ok = document.elementFromPoint(innerWidth / 2, innerHeight / 2) === before;
+        fitZoom();
+        return ok;
+    })()`));
+
     // 詳細は下から出るシート。取っ手が見えないと「つまんで下げられる」と分からない
     await page.evaluate(`openPanel(DATA.circles[0].screenName)`);
     await new Promise((r) => setTimeout(r, 300));

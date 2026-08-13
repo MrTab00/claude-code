@@ -1174,21 +1174,70 @@ function measureCanvas() {
   canvas.style.transform = t;
 }
 
+/*
+ * 会場の周りに空ける余白。地図の端で動きが止まらないようにするためのもの。
+ *
+ * 余白なしだと、スクロールできる範囲が会場の実寸ちょうどになり、端の島は必ず
+ * 画面の端に貼りついたままになる。拡大したとき、上端の島は浮かせた検索欄の
+ * 下に入ったきり引っ張り出せない —— どれだけ動かしても、もう上には何も無いので
+ * スクロールが効かない。
+ *
+ * 画面の半分ぶん空けておけば、会場のどの点でも画面の中央まで持ってこられる。
+ * それ以上は要らない(会場を完全に画面外へ追い出せてしまう)。
+ */
+let gutter = { x: 0, y: 0 };
+
 function applyZoom(z) {
   // 下限は低めに。会場は横に長いので、狭い画面だと全体表示で 10% 台になる。
   // 縮小時は文字を出さないので、小さくても輪郭の見取り図としては成立する
   zoom = Math.min(4, Math.max(0.07, z));
   const canvas = document.getElementById('mapcanvas');
+  const scroll = document.getElementById('mapscroll');
   canvas.style.transform = 'scale(' + zoom + ')';
 
-  // スクロール範囲を見た目の大きさに合わせる
+  /*
+   * 余白は「はみ出している向き」にだけ付ける。全体表示のように会場が画面に
+   * 収まりきっている間は 0 —— そこで余白を付けると、動かす必要が無いのに
+   * スクロールできてしまい、会場を画面の隅へ押しやれてしまう。
+   */
+  const over = (side, len) => (len * zoom > side ? Math.round(side / 2) : 0);
+  gutter = { x: over(scroll.clientWidth, natural.w), y: over(scroll.clientHeight, natural.h) };
+  canvas.style.left = gutter.x + 'px';
+  canvas.style.top = gutter.y + 'px';
+
+  // スクロール範囲を見た目の大きさ + 前後の余白に合わせる
   const sizer = document.getElementById('mapsizer');
-  sizer.style.width = Math.round(natural.w * zoom) + 'px';
-  sizer.style.height = Math.round(natural.h * zoom) + 'px';
+  sizer.style.width = Math.round(natural.w * zoom) + gutter.x * 2 + 'px';
+  sizer.style.height = Math.round(natural.h * zoom) + gutter.y * 2 + 'px';
 
   // 縮小時は文字を出さない。読めない字を並べても意味がないし、描画も重い
   canvas.dataset.detail = zoom < 0.7 ? '0' : zoom < 1.25 ? '1' : '2';
   document.getElementById('zoomlabel').textContent = Math.round(zoom * 100) + '%';
+}
+
+/** 会場を画面の真ん中に置く。余白があるぶん、左上に寄せるのでは端に寄って見える */
+function centerMap() {
+  const s = document.getElementById('mapscroll');
+  s.scrollLeft = Math.round((s.scrollWidth - s.clientWidth) / 2);
+  s.scrollTop = Math.round((s.scrollHeight - s.clientHeight) / 2);
+}
+
+/**
+ * ある一点を動かさずに倍率だけ変える。
+ * 指定が無ければ画面の中央を軸にする —— ボタンで拡大したとき、
+ * 見ていた場所がそのまま大きくなるのが素直な動き。
+ */
+function zoomAt(z, px, py) {
+  const s = document.getElementById('mapscroll');
+  const box = s.getBoundingClientRect();
+  const ax = px === undefined ? box.width / 2 : px;
+  const ay = py === undefined ? box.height / 2 : py;
+  // その点が会場のどこかを、今の倍率で覚えてから拡大する
+  const wx = (s.scrollLeft + ax - gutter.x) / zoom;
+  const wy = (s.scrollTop + ay - gutter.y) / zoom;
+  applyZoom(z);
+  s.scrollLeft = wx * zoom + gutter.x - ax;
+  s.scrollTop = wy * zoom + gutter.y - ay;
 }
 
 /**
@@ -1221,7 +1270,7 @@ function sizeMapScroll() {
   scroll.style.height = (state.tab === 'plan' ? Math.min(rest, Math.round(window.innerHeight * 0.34)) : rest) + 'px';
 }
 
-/** 会場が丸ごと収まる倍率にして左上へ戻す。縦も入れないと南まで見えない */
+/** 会場が丸ごと収まる倍率にして真ん中に置く。縦も入れないと南まで見えない */
 function fitZoom() {
   sizeMapScroll();
   const scroll = document.getElementById('mapscroll');
@@ -1239,7 +1288,7 @@ function fitZoom() {
     // マスばかり大きくなって一度に見える範囲がかえって狭くなる
     applyZoom(Math.min(1, byW, byH));
   }
-  scroll.scrollTo(0, 0);
+  centerMap();
 }
 
 /**
@@ -1661,8 +1710,8 @@ document.getElementById('mapcanvas').addEventListener('click', ev => {
   if (sp) openPanel(sp.dataset.sn);
 });
 
-document.getElementById('zoom-in').addEventListener('click', () => applyZoom(zoom * 1.4));
-document.getElementById('zoom-out').addEventListener('click', () => applyZoom(zoom / 1.4));
+document.getElementById('zoom-in').addEventListener('click', () => zoomAt(zoom * 1.4));
+document.getElementById('zoom-out').addEventListener('click', () => zoomAt(zoom / 1.4));
 document.getElementById('zoom-fit').addEventListener('click', fitZoom);
 
 /*
@@ -1684,9 +1733,9 @@ mapScroll.addEventListener('touchstart', ev => {
   pinch = {
     dist: touchDist(t),
     zoom,
-    // つまんだ点が中身のどこかを、今の倍率で覚えておく
-    cx: (mapScroll.scrollLeft + mid.x - box.left) / zoom,
-    cy: (mapScroll.scrollTop + mid.y - box.top) / zoom,
+    // つまんだ点が会場のどこかを、今の倍率で覚えておく(余白ぶんを引いた座標)
+    cx: (mapScroll.scrollLeft + mid.x - box.left - gutter.x) / zoom,
+    cy: (mapScroll.scrollTop + mid.y - box.top - gutter.y) / zoom,
   };
 }, { passive: true });
 
@@ -1698,8 +1747,8 @@ mapScroll.addEventListener('touchmove', ev => {
 
   const mid = touchMid(t);
   const box = mapScroll.getBoundingClientRect();
-  mapScroll.scrollLeft = pinch.cx * zoom - (mid.x - box.left);
-  mapScroll.scrollTop = pinch.cy * zoom - (mid.y - box.top);
+  mapScroll.scrollLeft = pinch.cx * zoom + gutter.x - (mid.x - box.left);
+  mapScroll.scrollTop = pinch.cy * zoom + gutter.y - (mid.y - box.top);
 }, { passive: false });
 
 mapScroll.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; }, { passive: true });
@@ -1736,12 +1785,8 @@ mapScroll.addEventListener('touchend', ev => {
     if (ev.target.closest('.sp') || ev.target.closest('.cb')) return; // マスを開く操作を邪魔しない
     if (zoom > 1) { fitZoom(); return; }
     const box = mapScroll.getBoundingClientRect();
-    // 叩いた点が中身のどこかを今の倍率で求めてから、拡大後にその点を画面の中央へ
-    const cx = (mapScroll.scrollLeft + t.clientX - box.left) / zoom;
-    const cy = (mapScroll.scrollTop + t.clientY - box.top) / zoom;
-    applyZoom(1.8);
-    mapScroll.scrollLeft = cx * zoom - box.width / 2;
-    mapScroll.scrollTop = cy * zoom - box.height / 2;
+    // 叩いた場所を軸にして拡大する。軸を画面中央に取ると見たかった所が画面外へ飛ぶ
+    zoomAt(1.8, t.clientX - box.left, t.clientY - box.top);
   }
   lastTap = now;
   if (t) lastTapAt = { x: t.clientX, y: t.clientY };
