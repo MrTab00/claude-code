@@ -539,6 +539,13 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 
 /* 絞り込みの開閉ボタン。狭い画面でだけ出す */
 #filter-toggle { display: none; }
+/* 言語の切り替え。ネイティブの select にしてある —— スマホでは OS の選択 UI が出て一番早い */
+.langpick {
+  appearance: none; flex: none; cursor: pointer;
+  padding: 7px 13px; min-height: var(--tap); border-radius: var(--r-pill);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+  font: 600 13px var(--sans);
+}
 /* 取っ手(シートをつまんで下げる帯)はスマホ表示だけ。既定では出さない */
 #panel .grab { display: none; }
 
@@ -696,9 +703,247 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 
 const JS = String.raw`
 const DATA = JSON.parse(document.getElementById('c108-data').textContent);
-const DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, d.label]));
 
-const SOURCE_LABEL = { name: '表示名', bio: 'プロフィール', account: '別ツイート' };
+/*
+ * --- 表示言語 ---
+ *
+ * 訳すのは画面の言葉だけ。ツイート本文・サークル名・作品名はそのまま出す ——
+ * 集めてきた元の文であって、こちらが書き換えていいものではない。
+ *
+ * 配置番号(東1 ア-22a, 企業ブースの 4 桁)も訳さない。会場で見上げる看板と
+ * 一字一句同じでないと、現地で突き合わせられなくなる。地区の「東・西・南」も同じ理由で漢字のまま。
+ */
+const I18N = {
+  ja: {
+    'title':        '{event} 情報まとめ',
+    'eyebrow':      '2026.08.15 – 08.16 · 東京ビッグサイト',
+    'stat.circles': 'サークル', 'stat.cosplayers': 'コスプレイヤー', 'stat.tweets': 'ツイートから',
+    'gen':          '生成 {when}', 'gen.overrides': ' · 人工修正 {n} 件適用',
+    'tab.map': '地図', 'tab.plan': 'プラン', 'tab.circles': 'サークル', 'tab.cosplayers': 'コスプレイヤー',
+    'search':       'サークル名 / 作者 / キャラ / 作品 / 本文 を検索',
+    'filters':      '絞り込み',
+    'mark.must': '★絶対', 'mark.like': '♡気になる', 'mark.skip': '⊖見送り', 'mark.buy': '✓購入済',
+    'buy.all': '購入: すべて', 'buy.todo': '未購入だけ', 'buy.done': '購入済だけ',
+    'sort.space': '配置順', 'sort.new': '新着順',
+    'group':        'サークル単位',
+    'media':        '画像あり',
+    'count':        '{n} / {all} {unit}', 'unit.group': '組', 'unit.item': '件',
+    'view.cards': 'カード', 'view.table': '表',
+    'print':        '印刷',      'print.t':  '今の絞り込み・並び順で印刷します',
+    'csv.t':        '今の絞り込み・並び順で書き出します',
+    'export':       'チェックを書き出す', 'export.t': 'チェック・メモをファイルに書き出して別の端末へ',
+    'import':       'チェックを読み込む', 'import.ok': '読み込みました ✓', 'import.ng': '読み込めませんでした: {err}',
+    'readall':      'すべて既読にする',   'readall.t': '「新着」の印をすべて消します',
+    'bldg.all':     '全体',
+    'map.note':     '公式配置図のホール構成に沿った地図です。通路や島の細かな位置までは再現していません — 正確な配置は',
+    'map.note.link': 'コミケWebカタログ',
+    'map.note.end': ' で確認してください',
+    'zoom.out': '縮小', 'zoom.in': '拡大', 'zoom.fit': '全体',
+    'map.stray':    '構成表に無いブロック',
+    'plan.empty':   'まだ印がありません。',
+    'plan.empty2':  'サークル一覧や地図でカードを開いて <b>★絶対</b> か <b>♡気になる</b> を付けると、ここに並びます。',
+    'plan.note':    '{n} サークル · 地図はこの印だけを表示しています',
+    'plan.done':    '済',
+    'day.n':        '{n}日目', 'day.unknown': '日程不明',
+    'area.suffix':  '地区', 'space.unknown': '配置不明',
+    'new':          '新着',
+    'more':         '全文を表示', 'less': '折りたたむ',
+    'source':       '原文',
+    'memo':         'メモ', 'memo.ph': '新刊あり / 無配欲しい / 時間あれば 等',
+    'posts':        '投稿 ({n})',
+    'close':        '閉じる',
+    'empty':        '条件に合う項目がありません',
+    'th.state': '状態', 'th.space': '配置', 'th.circle': 'サークル', 'th.price': '金額', 'th.memo': 'メモ',
+    'csv.day': '日程', 'csv.name': 'サークル名', 'csv.account': 'アカウント', 'csv.works': '作品・キャラ', 'csv.bought': '購入済',
+    'guess.name': '推定', 'guess.name.t': 'サークル名は推定です',
+    'guess.char': 'キャラ推定', 'guess.char.t': '本文からの推定です',
+    'has.shinagaki': 'お品書きあり', 'dual': 'サークル兼レイヤー', 'posts.merged': '{n} 投稿をまとめて表示',
+    'src.name': '表示名', 'src.bio': 'プロフィール', 'src.account': '別ツイート',
+    'note.1': '非公式のファンメイドツールです。コミックマーケット準備会および各サークルとは一切関係ありません。配置・頒布情報は X の投稿から機械的に抽出したもので、正確性は保証されません — 必ず',
+    'note.2': '等でご確認ください。画像・本文の権利は各投稿者に帰属します。当ページは X 上の原ツイートを参照表示するだけで保存はしておらず、原ツイートが削除されると表示されなくなります。チェック・メモはお使いのブラウザ内(localStorage)にのみ保存され、どこにも送信されません。',
+    'note.link': '公式Webカタログ',
+  },
+  zh: {
+    'title':        '{event} 摊位情报汇总',
+    'eyebrow':      '2026.08.15 – 08.16 · 东京 Big Sight',
+    'stat.circles': '社团', 'stat.cosplayers': 'Coser', 'stat.tweets': '条推文',
+    'gen':          '生成于 {when}', 'gen.overrides': ' · 已应用 {n} 条人工修正',
+    'tab.map': '地图', 'tab.plan': '计划', 'tab.circles': '社团', 'tab.cosplayers': 'Coser',
+    'search':       '搜索社团名 / 作者 / 角色 / 作品 / 正文',
+    'filters':      '筛选',
+    'mark.must': '★必去', 'mark.like': '♡想去', 'mark.skip': '⊖略过', 'mark.buy': '✓已买',
+    'buy.all': '购买: 全部', 'buy.todo': '只看未买', 'buy.done': '只看已买',
+    'sort.space': '按摊位号', 'sort.new': '按时间',
+    'group':        '按社团合并',
+    'media':        '有图',
+    'count':        '{n} / {all} {unit}', 'unit.group': '组', 'unit.item': '条',
+    'view.cards': '卡片', 'view.table': '表格',
+    'print':        '打印',      'print.t':  '按当前筛选和排序打印',
+    'csv.t':        '按当前筛选和排序导出',
+    'export':       '导出勾选', 'export.t': '把勾选和备注存成文件，带到别的设备',
+    'import':       '导入勾选', 'import.ok': '已导入 ✓', 'import.ng': '导入失败: {err}',
+    'readall':      '全部标为已读', 'readall.t': '清掉所有「新」标记',
+    'bldg.all':     '全部',
+    'map.note':     '按官方配置图的展馆结构绘制。通道和岛的细节位置没有还原 — 准确配置请查',
+    'map.note.link': 'Comiket Web Catalog',
+    'map.note.end': '',
+    'zoom.out': '缩小', 'zoom.in': '放大', 'zoom.fit': '全部',
+    'map.stray':    '不在配置表里的区块',
+    'plan.empty':   '还没有标记。',
+    'plan.empty2':  '在社团列表或地图上打开卡片，标记 <b>★必去</b> 或 <b>♡想去</b>，就会出现在这里。',
+    'plan.note':    '{n} 个社团 · 地图上只显示这些标记',
+    'plan.done':    '已买',
+    'day.n':        '第{n}天', 'day.unknown': '日期不明',
+    'area.suffix':  '区', 'space.unknown': '摊位不明',
+    'new':          '新',
+    'more':         '展开全文', 'less': '收起',
+    'source':       '原推文',
+    'memo':         '备注', 'memo.ph': '有新刊 / 想要无料 / 有时间再去 等',
+    'posts':        '推文 ({n})',
+    'close':        '关闭',
+    'empty':        '没有符合条件的项目',
+    'th.state': '标记', 'th.space': '摊位', 'th.circle': '社团', 'th.price': '金额', 'th.memo': '备注',
+    'csv.day': '日期', 'csv.name': '社团名', 'csv.account': '账号', 'csv.works': '作品·角色', 'csv.bought': '已买',
+    'guess.name': '推测', 'guess.name.t': '社团名是推测出来的',
+    'guess.char': '角色推测', 'guess.char.t': '从正文推测出来的',
+    'has.shinagaki': '有品书', 'dual': '社团兼 Coser', 'posts.merged': '合并显示 {n} 条推文',
+    'src.name': '显示名', 'src.bio': '简介', 'src.account': '同账号其他推文',
+    'note.1': '非官方的爱好者工具，与 Comic Market 准备会及各社团没有任何关系。摊位和頒布信息是从 X 的推文里机械提取的，不保证准确 — 请务必以',
+    'note.2': '为准。图片和正文的权利属于各发布者。本页只引用 X 上的原推文，不保存任何内容；原推文被删除后就不再显示。勾选和备注只存在你自己的浏览器里(localStorage)，不会发送到任何地方。',
+    'note.link': '官方 Web Catalog',
+  },
+  en: {
+    'title':        '{event} Circle Directory',
+    'eyebrow':      '2026.08.15 – 08.16 · Tokyo Big Sight',
+    'stat.circles': 'circles', 'stat.cosplayers': 'cosplayers', 'stat.tweets': 'from posts',
+    'gen':          'Generated {when}', 'gen.overrides': ' · {n} manual fixes applied',
+    'tab.map': 'Map', 'tab.plan': 'Plan', 'tab.circles': 'Circles', 'tab.cosplayers': 'Cosplayers',
+    'search':       'Search circle, artist, character, series, text',
+    'filters':      'Filters',
+    'mark.must': '★ Must', 'mark.like': '♡ Maybe', 'mark.skip': '⊖ Skip', 'mark.buy': '✓ Bought',
+    'buy.all': 'Bought: all', 'buy.todo': 'Not yet', 'buy.done': 'Bought only',
+    'sort.space': 'By space', 'sort.new': 'Newest',
+    'group':        'Group by circle',
+    'media':        'With image',
+    'count':        '{n} / {all} {unit}', 'unit.group': 'groups', 'unit.item': 'items',
+    'view.cards': 'Cards', 'view.table': 'Table',
+    'print':        'Print',     'print.t':  'Prints the current filter and order',
+    'csv.t':        'Exports the current filter and order',
+    'export':       'Export marks', 'export.t': 'Save marks and notes to a file for another device',
+    'import':       'Import marks', 'import.ok': 'Imported ✓', 'import.ng': 'Could not import: {err}',
+    'readall':      'Mark all read', 'readall.t': 'Clears every "new" flag',
+    'bldg.all':     'All',
+    'map.note':     'Drawn to the hall layout of the official floor plan. Aisles and exact island positions are not reproduced — check',
+    'map.note.link': 'the Comiket Web Catalog',
+    'map.note.end': ' for the authoritative placement',
+    'zoom.out': 'Zoom out', 'zoom.in': 'Zoom in', 'zoom.fit': 'Fit',
+    'map.stray':    'Blocks not in the floor plan',
+    'plan.empty':   'Nothing marked yet.',
+    'plan.empty2':  'Open a card from the circle list or the map and mark it <b>★ Must</b> or <b>♡ Maybe</b> — it will show up here.',
+    'plan.note':    '{n} circles · the map shows only these',
+    'plan.done':    'done',
+    'day.n':        'Day {n}', 'day.unknown': 'Day unknown',
+    'area.suffix':  ' area', 'space.unknown': 'Space unknown',
+    'new':          'new',
+    'more':         'Show all', 'less': 'Collapse',
+    'source':       'Source',
+    'memo':         'Notes', 'memo.ph': 'New book / want the freebie / if there is time…',
+    'posts':        'Posts ({n})',
+    'close':        'Close',
+    'empty':        'Nothing matches the current filters',
+    'th.state': 'Mark', 'th.space': 'Space', 'th.circle': 'Circle', 'th.price': 'Price', 'th.memo': 'Notes',
+    'csv.day': 'Day', 'csv.name': 'Circle', 'csv.account': 'Account', 'csv.works': 'Series / character', 'csv.bought': 'Bought',
+    'guess.name': 'guess', 'guess.name.t': 'Circle name is inferred',
+    'guess.char': 'character guess', 'guess.char.t': 'Inferred from the post text',
+    'has.shinagaki': 'has lineup image', 'dual': 'circle & cosplayer', 'posts.merged': '{n} posts merged',
+    'src.name': 'display name', 'src.bio': 'bio', 'src.account': 'another post',
+    'note.1': 'An unofficial, fan-made tool. Not affiliated with the Comic Market Preparatory Committee or any circle. Placement and release details are extracted mechanically from posts on X and are not guaranteed to be correct — always confirm against',
+    'note.2': '. Images and text belong to their posters. This page only references the original posts on X and stores nothing; if a post is deleted it stops showing. Marks and notes live only in your own browser (localStorage) and are never sent anywhere.',
+    'note.link': 'the official Web Catalog',
+  },
+};
+
+/** 端末の言語から選ぶ。日本語以外の中国語圏は zh、それ以外は en に寄せる */
+function detectLang() {
+  const saved = (() => { try { return localStorage.getItem('c108.lang'); } catch { return null; } })();
+  if (saved && I18N[saved]) return saved;
+  for (const l of navigator.languages || [navigator.language || '']) {
+    const s = String(l).toLowerCase();
+    if (s.startsWith('ja')) return 'ja';
+    if (s.startsWith('zh')) return 'zh';
+    if (s.startsWith('en')) return 'en';
+  }
+  return 'ja';
+}
+
+let lang = detectLang();
+
+/** 訳語を引く。{n} のような差し込みは第 2 引数で渡す */
+function t(key, vars) {
+  let s = (I18N[lang] || I18N.ja)[key];
+  if (s === undefined) s = I18N.ja[key] !== undefined ? I18N.ja[key] : key;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] === undefined ? m : vars[k])) : s;
+}
+
+/*
+ * 日付の見出し。データに入っている label は日本語なので、そのままだと言語を変えても
+ * ここだけ日本語で残る。日付から組み直す。
+ */
+const DAY_LABEL_FOR = (d) => {
+  const day = DATA.event.days.find(x => x.day === d);
+  if (!day) return t('day.n', { n: d });
+  const dt = new Date(day.date + 'T00:00:00');
+  const loc = lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : 'en-US';
+  const md = dt.toLocaleDateString(loc, { month: 'numeric', day: 'numeric', weekday: 'short' });
+  return t('day.n', { n: d }) + ' ' + md;
+};
+let DAY_LABEL = {};
+
+const SOURCE_LABEL_FOR = () => ({ name: t('src.name'), bio: t('src.bio'), account: t('src.account') });
+let SOURCE_LABEL = {};
+
+/**
+ * 画面の言葉を今の言語に入れ替える。
+ *
+ * 固定の文言は HTML 側に data-i18n を付けてあり、ここで一括で流し込む。
+ * 初期表示は日本語のまま書いてあるので、JS が動く前でも文字の無い画面にはならない。
+ */
+function applyLang(next) {
+  if (next && I18N[next]) {
+    lang = next;
+    try { localStorage.setItem('c108.lang', lang); } catch {}
+  }
+  DAY_LABEL = Object.fromEntries(DATA.event.days.map(d => [d.day, DAY_LABEL_FOR(d.day)]));
+  SOURCE_LABEL = SOURCE_LABEL_FOR();
+  document.documentElement.lang = lang;
+
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  // 日程チップのラベルは訳語ではなく日付から組む
+  for (const el of document.querySelectorAll('#day-filter [data-day]')) el.textContent = DAY_LABEL[el.dataset.day];
+  for (const el of document.querySelectorAll('[data-i18n-html]')) el.innerHTML = t(el.dataset.i18nHtml);
+  for (const el of document.querySelectorAll('[data-i18n-ph]')) el.placeholder = t(el.dataset.i18nPh);
+  for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t(el.dataset.i18nAria));
+
+  document.title = t('title', { event: DATA.event.name });
+  const h1 = document.querySelector('.head h1');
+  if (h1) h1.textContent = document.title;
+  const gen = document.querySelector('.gen');
+  if (gen) {
+    const when = new Date(DATA.generatedAt).toLocaleString(lang === 'ja' ? 'ja-JP' : lang === 'zh' ? 'zh-CN' : 'en-US');
+    gen.textContent = t('gen', { when }) +
+      (DATA.stats.overridesApplied ? t('gen.overrides', { n: DATA.stats.overridesApplied }) : '');
+  }
+  // 状態によって文言が変わるボタンは、押されたときと同じ規則で入れ直す
+  const sortBtn = document.getElementById('sort-toggle');
+  if (sortBtn) sortBtn.textContent = state.sort === 'space' ? t('sort.space') : t('sort.new');
+  const buyBtn = document.getElementById('buy-filter');
+  if (buyBtn) buyBtn.textContent = t('buy.' + state.buyFilter);
+  const sel = document.getElementById('lang');
+  if (sel) sel.value = lang;
+
+  render();
+}
 
 // 公式配置図から起こしたホール構成と、ブロック→ホールの逆引き
 const FLOOR = __FLOOR__;
@@ -893,7 +1138,8 @@ function shotsHtml(e) {
 function whoHtml(e) {
   return '<div class="who">' +
     (e.circleName ? '<strong>' + esc(e.circleName) + '</strong>' +
-      (e.circleNameConfidence === 'low' ? '<span class="flag" title="サークル名は推定です">推定</span>' : '') : '') +
+      (e.circleNameConfidence === 'low'
+        ? '<span class="flag" title="' + esc(t('guess.name.t')) + '">' + esc(t('guess.name')) + '</span>' : '') : '') +
     '<a href="https://x.com/' + esc(e.screenName) + '" target="_blank" rel="noopener">@' + esc(e.screenName) + '</a>' +
     '</div>';
 }
@@ -909,24 +1155,24 @@ function tagsHtml(e) {
 function footHtml(e) {
   const bits = [];
   const d = entryDays(e);
-  if (d.length) bits.push(esc(d.map(x => DAY_LABEL[x] || x + '日目').join(' / ')));
+  if (d.length) bits.push(esc(d.map(x => DAY_LABEL[x] || t('day.n', { n: x })).join(' / ')));
   if (e.locations && e.locations.length) bits.push(esc(e.locations.join(' · ')));
   if (e.price) bits.push(esc(e.price));
-  if (e.hasShinagaki) bits.push('お品書きあり');
-  if (e.dual) bits.push('サークル兼レイヤー');
-  if (e.posts > 1) bits.push(esc(e.posts) + ' 投稿をまとめて表示');
+  if (e.hasShinagaki) bits.push(esc(t('has.shinagaki')));
+  if (e.dual) bits.push(esc(t('dual')));
+  if (e.posts > 1) bits.push(esc(t('posts.merged', { n: e.posts })));
 
   let html = '<div class="foot">' + (bits.length ? '<span>' + bits.join(' · ') + '</span>' : '');
   if (e.charactersConfidence === 'low' && (e.characters || []).length)
-    html += '<span class="flag" title="本文からの推定です">キャラ推定</span>';
-  return html + '<a class="src" href="' + esc(e.url) + '" target="_blank" rel="noopener">原文 ↗</a></div>';
+    html += '<span class="flag" title="' + esc(t('guess.char.t')) + '">' + esc(t('guess.char')) + '</span>';
+  return html + '<a class="src" href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(t('source')) + ' ↗</a></div>';
 }
 
-const MARK_DEFS = [['must', '★絶対'], ['like', '♡気になる'], ['skip', '⊖見送り'], ['buy', '✓購入済']];
+const MARK_KEYS = ['must', 'like', 'skip', 'buy'];
 
 function marksHtml(sn) {
   const m = markOf(sn);
-  return '<div class="marks" data-sn="' + esc(sn) + '">' + MARK_DEFS.map(([k, label]) =>
+  return '<div class="marks" data-sn="' + esc(sn) + '">' + MARK_KEYS.map(k => [k, t('mark.' + k)]).map(([k, label]) =>
     '<button class="mk" type="button" data-mk="' + k + '" aria-pressed="' +
     (k === 'buy' ? !!m.b : m.s === k) + '">' + label + '</button>'
   ).join('') + '</div>';
@@ -939,9 +1185,9 @@ function cardHtml(e) {
     (area ? ' data-area="' + esc(area) + '"' : '') +
     (m.s ? ' data-mark="' + m.s + '"' : '') + (m.b ? ' data-bought="true"' : '') + '>' +
     (e.kind === 'circle' ? boothHtml(e) : '') +
-    whoHtml(e) + (isNew(e) ? '<div><span class="flag new">新着</span></div>' : '') + tagsHtml(e) +
+    whoHtml(e) + (isNew(e) ? '<div><span class="flag new">' + esc(t('new')) + '</span></div>' : '') + tagsHtml(e) +
     shotsHtml(e) +
-    (e.text ? '<div class="body">' + esc(e.text) + '</div><button class="more" type="button">全文を表示</button>' : '') +
+    (e.text ? '<div class="body">' + esc(e.text) + '</div><button class="more" type="button">' + esc(t('more')) + '</button>' : '') +
     (m.m ? '<div class="foot">📝 ' + esc(m.m) + '</div>' : '') +
     marksHtml(e.screenName) +
     footHtml(e) +
@@ -959,7 +1205,7 @@ function rowHtml(e) {
     '<td>' + esc(e.circleName || e.displayName) + ' <a href="https://x.com/' + esc(e.screenName) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">@' + esc(e.screenName) + '</a></td>' +
     '<td>' + esc(e.price || '') + '</td>' +
     '<td class="memo-cell">' + esc(m.m || '') + '</td>' +
-    '<td><a href="' + esc(e.url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">原文</a></td>' +
+    '<td><a href="' + esc(e.url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(t('source')) + '</a></td>' +
   '</tr>';
 }
 
@@ -1155,7 +1401,7 @@ function renderMap(rows) {
 
   if (strays.size && !state.bldg) {
     const list = [...strays.entries()].map(([k, n]) => esc(k.replace('/', ' ')) + ' (' + n + ')').join('  ');
-    html += '<div class="frow"><div class="bldg stray"><h4>構成表に無いブロック</h4>' +
+    html += '<div class="frow"><div class="bldg stray"><h4>' + esc(t('map.stray')) + '</h4>' +
             '<div class="note">' + list + '</div></div></div>';
   }
 
@@ -1308,8 +1554,7 @@ function renderPlan(rows) {
   wrap.hidden = false;
 
   if (!rows.length) {
-    wrap.innerHTML = '<div class="empty">まだ印がありません。<br>' +
-      'サークル一覧や地図でカードを開いて <b>★絶対</b> か <b>♡気になる</b> を付けると、ここに並びます。</div>';
+    wrap.innerHTML = '<div class="empty">' + esc(t('plan.empty')) + '<br>' + t('plan.empty2') + '</div>';
     return;
   }
 
@@ -1335,23 +1580,24 @@ function renderPlan(rows) {
   let html = '<div class="plansum">' +
     '<span class="pill must">★ ' + counts.must + '</span>' +
     '<span class="pill like">♡ ' + counts.like + '</span>' +
-    '<span class="pnote">' + rows.length + ' サークル · 地図はこの印だけを表示しています</span></div>';
+    '<span class="pnote">' + esc(t('plan.note', { n: rows.length })) + '</span></div>';
 
   for (const g of groups) {
     g.items.sort((x, y) => bySpace(x.e, y.e));
     html += '<section class="pgroup"><h3>' +
-      (g.day ? esc(DAY_LABEL[g.day] || g.day + '日目') : '日程不明') +
-      '<span class="parea" data-area="' + esc(g.area) + '">' + esc(g.area === '—' ? '配置不明' : g.area + '地区') + '</span>' +
+      esc(g.day ? (DAY_LABEL[g.day] || t('day.n', { n: g.day })) : t('day.unknown')) +
+      '<span class="parea" data-area="' + esc(g.area) + '">' +
+        esc(g.area === '—' ? t('space.unknown') : g.area + t('area.suffix')) + '</span>' +
       '<span class="pn">' + g.items.length + '</span></h3><ul class="plist">';
     for (const { e, b, o } of g.items) {
       const m = markOf(e.screenName);
       html += '<li><button class="prow" type="button" data-sn="' + esc(e.screenName) + '">' +
         '<span class="pmark ' + esc(m.s) + '">' + (m.s === 'must' ? '★' : '♡') + '</span>' +
         '<span class="pspace"' + (o ? ' data-area="' + esc(o.area) + '"' : '') + '>' +
-          esc(b ? b.display.replace(/^\d日目\s*/, '') : '配置不明') + '</span>' +
+          esc(b ? b.display.replace(/^\d日目\s*/, '') : t('space.unknown')) + '</span>' +
         '<span class="pname">' + esc(e.circleName || e.displayName) +
           (m.m ? '<span class="pmemo">' + esc(m.m) + '</span>' : '') + '</span>' +
-        (m.b ? '<span class="pdone">済</span>' : '') +
+        (m.b ? '<span class="pdone">' + esc(t('plan.done')) + '</span>' : '') +
         '</button></li>';
     }
     html += '</ul></section>';
@@ -1380,7 +1626,7 @@ function render() {
   renderPlan(onPlan ? list : []);
   document.getElementById('plan-n').textContent = rowsFor('plan').length;
   document.getElementById('count').textContent =
-    list.length + ' / ' + all.length + (state.grouped ? ' 組' : ' 件');
+    t('count', { n: list.length, all: all.length, unit: t(state.grouped ? 'unit.group' : 'unit.item') });
 
   for (const t of ['circles', 'cosplayers']) {
     const n = rowsFor(t).length;
@@ -1409,7 +1655,7 @@ function render() {
     grid.hidden = true;
     twrap.hidden = false;
     twrap.innerHTML = '<table class="ltable"><thead><tr>' +
-      '<th>状態</th><th>配置</th><th>サークル</th><th>金額</th><th>メモ</th><th></th>' +
+      ['th.state', 'th.space', 'th.circle', 'th.price', 'th.memo'].map(k => '<th>' + esc(t(k)) + '</th>').join('') + '<th></th>' +
       '</tr></thead><tbody>' + list.map(rowHtml).join('') + '</tbody></table>';
   } else {
     twrap.hidden = true;
@@ -1460,13 +1706,14 @@ function appendChunk() {
 /** 今の絞り込み・並び順のまま CSV にする(Excel 向けに BOM 付き UTF-8) */
 function buildCsv() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const rows = [['状態', '購入済', '日程', '配置', 'サークル名', 'アカウント', '金額', '作品・キャラ', 'メモ', 'URL']];
+  const rows = [[t('th.state'), t('csv.bought'), t('csv.day'), t('th.space'), t('csv.name'),
+                 t('csv.account'), t('th.price'), t('csv.works'), t('th.memo'), 'URL']];
   for (const e of lastList) {
     const m = markOf(e.screenName);
     rows.push([
-      m.s === 'must' ? '絶対' : m.s === 'like' ? '気になる' : m.s === 'skip' ? '見送り' : '',
-      m.b ? '済' : '',
-      entryDays(e).map(d => d + '日目').join('/'),
+      m.s ? t('mark.' + m.s) : '',
+      m.b ? t('plan.done') : '',
+      entryDays(e).map(d => t('day.n', { n: d })).join('/'),
       (e.booths || []).map(b => b.display).join(' / '),
       e.circleName || e.displayName,
       '@' + e.screenName,
@@ -1491,10 +1738,12 @@ function download(name, text, type) {
 function printList() {
   const q = esc;
   document.getElementById('printtable').innerHTML =
-    '<table><thead><tr><th>✓</th><th>状態</th><th>配置</th><th>サークル</th><th>金額</th><th>メモ</th></tr></thead><tbody>' +
+    '<table><thead><tr><th>✓</th>' +
+    ['th.state', 'th.space', 'th.circle', 'th.price', 'th.memo'].map(k => '<th>' + esc(t(k)) + '</th>').join('') +
+    '</tr></thead><tbody>' +
     lastList.map(e => {
       const m = markOf(e.screenName);
-      return '<tr><td>' + (m.b ? '✓' : '　') + '</td><td>' + (m.s ? { must: '絶対', like: '気になる', skip: '見送り' }[m.s] : '') +
+      return '<tr><td>' + (m.b ? '✓' : '　') + '</td><td>' + (m.s ? q(t('mark.' + m.s)) : '') +
         '</td><td>' + q((e.booths || []).map(b => b.display).join(' / ')) +
         '</td><td>' + q(e.circleName || e.displayName) + ' @' + q(e.screenName) +
         '</td><td>' + q(e.price || '') + '</td><td>' + q(m.m || '') + '</td></tr>';
@@ -1519,14 +1768,14 @@ function openPanel(sn) {
     '<div class="who"><a href="https://x.com/' + esc(sn) + '" target="_blank" rel="noopener">@' + esc(sn) + '</a></div>' +
     marksHtml(sn) +
     tagsHtml(head) +
-    '<div class="sec">メモ</div>' +
-    '<textarea class="memo" id="panel-memo" placeholder="新刊あり / 無配欲しい / 時間あれば 等">' + esc(m.m || '') + '</textarea>' +
-    '<div class="sec">投稿 (' + posts.length + ')</div>' +
+    '<div class="sec">' + esc(t('memo')) + '</div>' +
+    '<textarea class="memo" id="panel-memo" placeholder="' + esc(t('memo.ph')) + '">' + esc(m.m || '') + '</textarea>' +
+    '<div class="sec">' + esc(t('posts', { n: posts.length })) + '</div>' +
     posts.map(e =>
       '<div class="post"><time>' + esc((e.createdAt || '').slice(0, 16).replace('T', ' ')) + '</time>' +
       shotsHtml(e) +
       (e.text ? '<div class="body">' + esc(e.text) + '</div>' : '') +
-      '<div class="foot"><a class="src" href="' + esc(e.url) + '" target="_blank" rel="noopener">原文 ↗</a></div></div>'
+      '<div class="foot"><a class="src" href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(t('source')) + ' ↗</a></div></div>'
     ).join('');
 
   document.getElementById('panel-memo').addEventListener('input', ev => setMark(sn, { m: ev.target.value }));
@@ -1580,7 +1829,7 @@ bindToggle(document.getElementById('area-filter'), state.areas, false);
 
 document.getElementById('sort-toggle').addEventListener('click', ev => {
   state.sort = state.sort === 'space' ? 'newest' : 'space';
-  ev.currentTarget.textContent = state.sort === 'space' ? '配置順' : '新着順';
+  ev.currentTarget.textContent = state.sort === 'space' ? t('sort.space') : t('sort.new');
   render();
 });
 
@@ -1609,7 +1858,7 @@ document.getElementById('mark-filter').addEventListener('click', ev => {
 // --- 購入で絞る(すべて → 未購入 → 購入済 の三段循環) ---
 document.getElementById('buy-filter').addEventListener('click', ev => {
   state.buyFilter = state.buyFilter === 'all' ? 'todo' : state.buyFilter === 'todo' ? 'done' : 'all';
-  ev.currentTarget.textContent = { all: '購入: すべて', todo: '未購入だけ', done: '購入済だけ' }[state.buyFilter];
+  ev.currentTarget.textContent = t('buy.' + state.buyFilter);
   ev.currentTarget.setAttribute('aria-pressed', String(state.buyFilter !== 'all'));
   render();
 });
@@ -1640,10 +1889,10 @@ document.getElementById('import-file').addEventListener('change', async ev => {
     }
     saveStore();
     render();
-    document.getElementById('import-btn').textContent = '読み込みました ✓';
-    setTimeout(() => { document.getElementById('import-btn').textContent = 'チェックを読み込む'; }, 2000);
+    document.getElementById('import-btn').textContent = t('import.ok');
+    setTimeout(() => { document.getElementById('import-btn').textContent = t('import'); }, 2000);
   } catch (err) {
-    alert('読み込めませんでした: ' + err.message);
+    alert(t('import.ng', { err: err.message }));
   }
   ev.target.value = '';
 });
@@ -1854,7 +2103,7 @@ document.getElementById('grid').addEventListener('click', ev => {
   if (ev.target.matches('.more')) {
     const body = ev.target.previousElementSibling;
     body.classList.toggle('open');
-    ev.target.textContent = body.classList.contains('open') ? '折りたたむ' : '全文を表示';
+    ev.target.textContent = t(body.classList.contains('open') ? 'less' : 'more');
     return;
   }
   if (ev.target.tagName === 'IMG') {
@@ -1887,8 +2136,15 @@ new IntersectionObserver(entries => {
 }, { rootMargin: '600px' }).observe(document.getElementById('more-sentinel'));
 
 initSeen([...DATA.circles, ...DATA.cosplayers]);
-render();
+// applyLang が中で render() まで面倒を見る
+applyLang();
 fitZoom();
+
+// 言語を切り替える。地図の倍率は保ったまま、文言だけ入れ替える
+document.getElementById('lang').addEventListener('change', ev => {
+  applyLang(ev.target.value);
+  fitZoom();
+});
 // フォントが差し替わると地図の実寸が数 px 変わる。落ち着いてからもう一度測って合わせ直す
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(() => { if (state.tab === 'map' || state.tab === 'plan') fitZoom(); });
@@ -1899,7 +2155,8 @@ addEventListener('resize', () => { if (state.tab === 'map' || state.tab === 'pla
 export function renderHtml(dataset: Dataset): string {
     const { stats, event, generatedAt } = dataset;
     const dayChips = event.days
-        .map((d) => `<button class="chip" type="button" data-value="${d.day}" aria-pressed="false">${d.label}</button>`)
+        // ラベルは applyLang が日付から組み直す。ここは JS が動く前の見え方だけ
+        .map((d) => `<button class="chip" type="button" data-value="${d.day}" data-day="${d.day}" aria-pressed="false">${d.label}</button>`)
         .join('');
     // 地図の絞り込みは棟単位。会場でも「東は東、西は西」でしか動かない
     const bldgChips = buildingIds()
@@ -1931,26 +2188,32 @@ export function renderHtml(dataset: Dataset): string {
 <body>
 <div class="wrap">
   <header class="head">
-    <div class="eyebrow">2026.08.15 – 08.16 · 東京ビッグサイト</div>
+    <div class="eyebrow" data-i18n="eyebrow">2026.08.15 – 08.16 · 東京ビッグサイト</div>
     <h1>${event.name} 情報まとめ</h1>
     <div class="summary">
-      <div class="stat"><b id="stat-circles">${stats.circles}</b><span>サークル</span></div>
-      <div class="stat"><b id="stat-cosplayers">${stats.cosplayers}</b><span>コスプレイヤー</span></div>
-      <div class="stat"><b>${stats.tweets}</b><span>ツイートから</span></div>
+      <div class="stat"><b id="stat-circles">${stats.circles}</b><span data-i18n="stat.circles">サークル</span></div>
+      <div class="stat"><b id="stat-cosplayers">${stats.cosplayers}</b><span data-i18n="stat.cosplayers">コスプレイヤー</span></div>
+      <div class="stat"><b>${stats.tweets}</b><span data-i18n="stat.tweets">ツイートから</span></div>
     </div>
     <div class="gen">生成 ${new Date(generatedAt).toLocaleString('ja-JP')}${stats.overridesApplied ? ` · 人工修正 ${stats.overridesApplied} 件適用` : ''}</div>
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab" type="button" role="tab" data-tab="map" aria-selected="true">地図</button>
-    <button class="tab" type="button" role="tab" data-tab="plan" aria-selected="false">プラン<span class="n" id="plan-n">0</span></button>
-    <button class="tab" type="button" role="tab" data-tab="circles" aria-selected="false">サークル<span class="n">${stats.circles}</span></button>
-    <button class="tab" type="button" role="tab" data-tab="cosplayers" aria-selected="false">コスプレイヤー<span class="n">${stats.cosplayers}</span></button>
+    <button class="tab" type="button" role="tab" data-tab="map" aria-selected="true"><span data-i18n="tab.map">地図</span></button>
+    <button class="tab" type="button" role="tab" data-tab="plan" aria-selected="false"><span data-i18n="tab.plan">プラン</span><span class="n" id="plan-n">0</span></button>
+    <button class="tab" type="button" role="tab" data-tab="circles" aria-selected="false"><span data-i18n="tab.circles">サークル</span><span class="n">${stats.circles}</span></button>
+    <button class="tab" type="button" role="tab" data-tab="cosplayers" aria-selected="false"><span data-i18n="tab.cosplayers">コスプレイヤー</span><span class="n">${stats.cosplayers}</span></button>
   </nav>
 
   <div class="toolbar">
-    <input id="q" type="search" placeholder="サークル名 / 作者 / キャラ / 作品 / 本文 を検索">
-    <button class="chip" type="button" id="filter-toggle" aria-expanded="false">絞り込み</button>
+    <input id="q" type="search" data-i18n-ph="search" placeholder="サークル名 / 作者 / キャラ / 作品 / 本文 を検索">
+    <!-- 言語切り替え。どのタブでもツールバーは出ているので、ここに置けば常に手が届く -->
+    <select id="lang" class="langpick" aria-label="Language">
+      <option value="ja">日本語</option>
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+    </select>
+    <button class="chip" type="button" id="filter-toggle" aria-expanded="false" data-i18n="filters">絞り込み</button>
     <div class="chips" id="day-filter">${dayChips}</div>
     <div class="chips" id="area-filter">
       <button class="chip" type="button" data-value="東" aria-pressed="false">東</button>
@@ -1958,44 +2221,44 @@ export function renderHtml(dataset: Dataset): string {
       <button class="chip" type="button" data-value="南" aria-pressed="false">南</button>
     </div>
     <div class="chips" id="mark-filter">
-      <button class="chip" type="button" data-value="must" aria-pressed="false">★絶対</button>
-      <button class="chip" type="button" data-value="like" aria-pressed="false">♡気になる</button>
+      <button class="chip" type="button" data-value="must" aria-pressed="false" data-i18n="mark.must">★絶対</button>
+      <button class="chip" type="button" data-value="like" aria-pressed="false" data-i18n="mark.like">♡気になる</button>
     </div>
     <div class="chips">
       <button class="chip" type="button" id="buy-filter" aria-pressed="false">購入: すべて</button>
       <button class="chip" type="button" id="sort-toggle" data-sort="space">配置順</button>
-      <button class="chip" type="button" id="group-toggle" aria-pressed="true">サークル単位</button>
-      <button class="chip" type="button" id="media-only" aria-pressed="false">画像あり</button>
+      <button class="chip" type="button" id="group-toggle" aria-pressed="true" data-i18n="group">サークル単位</button>
+      <button class="chip" type="button" id="media-only" aria-pressed="false" data-i18n="media">画像あり</button>
     </div>
     <span class="count" id="count"></span>
   </div>
 
   <div class="toolbar2">
     <div class="chips viewpick">
-      <button class="chip" type="button" data-view="cards" aria-pressed="true">カード</button>
-      <button class="chip" type="button" data-view="table" aria-pressed="false">表</button>
+      <button class="chip" type="button" data-view="cards" aria-pressed="true" data-i18n="view.cards">カード</button>
+      <button class="chip" type="button" data-view="table" aria-pressed="false" data-i18n="view.table">表</button>
     </div>
     <span class="spacer"></span>
-    <button class="chip" type="button" id="csv-btn" title="今の絞り込み・並び順で書き出します">CSV</button>
-    <button class="chip" type="button" id="print-btn" title="今の絞り込み・並び順で印刷します">印刷</button>
-    <button class="chip" type="button" id="export-btn" title="チェック・メモをファイルに書き出して別の端末へ">チェックを書き出す</button>
-    <button class="chip" type="button" id="import-btn">チェックを読み込む</button>
+    <button class="chip" type="button" id="csv-btn" data-i18n-title="csv.t" title="今の絞り込み・並び順で書き出します">CSV</button>
+    <button class="chip" type="button" id="print-btn" data-i18n="print" data-i18n-title="print.t" title="今の絞り込み・並び順で印刷します">印刷</button>
+    <button class="chip" type="button" id="export-btn" data-i18n="export" data-i18n-title="export.t" title="チェック・メモをファイルに書き出して別の端末へ">チェックを書き出す</button>
+    <button class="chip" type="button" id="import-btn" data-i18n="import">チェックを読み込む</button>
     <input type="file" id="import-file" accept="application/json" hidden>
-    <button class="chip" type="button" id="read-all-btn" title="「新着」の印をすべて消します">すべて既読にする</button>
+    <button class="chip" type="button" id="read-all-btn" data-i18n="readall" data-i18n-title="readall.t" title="「新着」の印をすべて消します">すべて既読にする</button>
   </div>
 
   <div class="mapwrap" id="mapwrap">
     <div class="bldgbar" id="bldgbar">
-      <button class="chip" type="button" data-bldg="" aria-pressed="true">全体</button>
+      <button class="chip" type="button" data-bldg="" aria-pressed="true" data-i18n="bldg.all">全体</button>
       ${bldgChips}
     </div>
     <div class="mapbar">
-      <span class="note">公式配置図のホール構成に沿った地図です。通路や島の細かな位置までは再現していません —
-        正確な配置は <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">コミケWebカタログ</a> で確認してください</span>
+      <span class="note"><span data-i18n="map.note">公式配置図のホール構成に沿った地図です。通路や島の細かな位置までは再現していません —
+        正確な配置は</span> <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener" data-i18n="map.note.link">コミケWebカタログ</a><span data-i18n="map.note.end"> で確認してください</span></span>
       <div class="zoom">
-        <button class="zbtn" type="button" id="zoom-out" aria-label="縮小">−</button>
-        <button class="zbtn" type="button" id="zoom-in" aria-label="拡大">＋</button>
-        <button class="zbtn wide" type="button" id="zoom-fit">全体</button>
+        <button class="zbtn" type="button" id="zoom-out" data-i18n-aria="zoom.out" aria-label="縮小">−</button>
+        <button class="zbtn" type="button" id="zoom-in" data-i18n-aria="zoom.in" aria-label="拡大">＋</button>
+        <button class="zbtn wide" type="button" id="zoom-fit" data-i18n="zoom.fit">全体</button>
         <span id="zoomlabel">100%</span>
       </div>
     </div>
@@ -2007,21 +2270,21 @@ export function renderHtml(dataset: Dataset): string {
   <div class="grid" id="grid"></div>
   <div id="more-sentinel" hidden></div>
   <div class="ltable-wrap" id="ltable-wrap" hidden></div>
-  <div class="empty" id="empty" hidden>条件に合う項目がありません</div>
+  <div class="empty" id="empty" data-i18n="empty" hidden>条件に合う項目がありません</div>
 
   <footer class="site-note">
-    非公式のファンメイドツールです。コミックマーケット準備会および各サークルとは一切関係ありません。
-    配置・頒布情報は X の投稿から機械的に抽出したもので、正確性は保証されません —
-    必ず <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener">公式Webカタログ</a> 等でご確認ください。
+    <span data-i18n="note.1">非公式のファンメイドツールです。コミックマーケット準備会および各サークルとは一切関係ありません。
+    配置・頒布情報は X の投稿から機械的に抽出したもので、正確性は保証されません — 必ず</span>
+    <a href="https://webcatalog.circle.ms/" target="_blank" rel="noopener" data-i18n="note.link">公式Webカタログ</a><span data-i18n="note.2"> 等でご確認ください。
     画像・本文の権利は各投稿者に帰属します。当ページは X 上の原ツイートを参照表示するだけで保存はしておらず、
     原ツイートが削除されると表示されなくなります。
-    チェック・メモはお使いのブラウザ内(localStorage)にのみ保存され、どこにも送信されません。
+    チェック・メモはお使いのブラウザ内(localStorage)にのみ保存され、どこにも送信されません。</span>
   </footer>
 </div>
 
 <aside id="panel" hidden>
   <span class="grab" aria-hidden="true"></span>
-  <button class="close" type="button" aria-label="閉じる">✕</button>
+  <button class="close" type="button" data-i18n-aria="close" aria-label="閉じる">✕</button>
   <div id="panel-body"></div>
 </aside>
 <div id="backdrop" hidden></div>

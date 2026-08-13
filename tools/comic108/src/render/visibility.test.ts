@@ -234,6 +234,35 @@ try {
     })()`));
     await page.evaluate(`closePanel()`);
 
+    /*
+     * 表示言語。訳し漏れは「動くけれど日本語が残る」だけなので、見ないと気付けない。
+     * 中国語・英語に切り替えて、画面の言葉に仮名が残っていないかを実物で数える。
+     * ツイート本文・サークル名・配置番号は訳さないもの —— 数える対象から外す。
+     */
+    for (const lg of ['zh', 'en']) {
+        await page.evaluate(`applyLang('${lg}')`);
+        await new Promise((r) => setTimeout(r, 300));
+        await page.evaluate(`document.querySelector('.tab[data-tab="circles"]').click()`);
+        await new Promise((r) => setTimeout(r, 300));
+        const left = await page.evaluate<string[]>(`(() => {
+            const skip = ['.body','.who','.tags','.b','.pspace','.blk','.sp','.cb','.mhall','.memo','.shots','#c108-data'];
+            const out = new Set();
+            const sel = 'button, th, label, .sec, .note, .site-note span, .flag, .foot span, .stat span, .empty, .pnote';
+            for (const el of document.querySelectorAll(sel)) {
+                if (skip.some(s => el.closest(s)) || !el.offsetParent) continue;
+                const txt = (el.textContent || '').trim();
+                if (/[\\u3040-\\u30ff]/.test(txt)) out.add(txt.slice(0, 40));
+            }
+            return [...out];
+        })()`);
+        check(`${lg} に切り替えると画面から仮名が消える`, left.length === 0, left);
+    }
+    // 選んだ言語は次に開いたときも続く
+    check('選んだ言語を覚えている', (await page.evaluate<string>(
+        'localStorage.getItem("c108.lang")')) === 'en');
+    await page.evaluate(`applyLang('ja'); document.querySelector('.tab[data-tab="map"]').click()`);
+    await new Promise((r) => setTimeout(r, 300));
+
     await page.close();
     conn.close();
 } finally {
