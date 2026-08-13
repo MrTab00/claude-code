@@ -44,6 +44,7 @@ const DARK_TOKENS = `
   --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 26px rgba(0,0,0,.42);
   --ring: rgba(255,92,147,.5);
   --scrim: rgba(3,6,11,.66);
+  --glass: rgba(21,27,37,.84);
 `;
 
 const CSS = `
@@ -71,6 +72,8 @@ const CSS = `
   --shadow: 0 1px 2px rgba(18,24,36,.06), 0 6px 20px rgba(18,24,36,.07);
   --ring: rgba(225,30,99,.45);
   --scrim: rgba(12,16,23,.5);
+  /* 地図の上に浮かせる面。下の会場が透けるだけの濃さにする */
+  --glass: rgba(255,255,255,.86);
 
   /* 角の丸み。触る前提なので、指で押す面はどれも丸く大きく取る */
   --r-sm: 8px;
@@ -552,7 +555,8 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   body.app { overflow: hidden; overscroll-behavior: none; }
   body.app .wrap { height: 100dvh; }
 
-  .wrap { padding: 0; gap: 0; max-width: none; display: flex; flex-direction: column; min-height: 100dvh; }
+  /* position: relative は、地図タブで操作列を浮かせるときの基準になる */
+  .wrap { position: relative; padding: 0; gap: 0; max-width: none; display: flex; flex-direction: column; min-height: 100dvh; }
   .head { padding: 12px 14px 6px; gap: 0; }
   .summary, .gen, .head .eyebrow { display: none; }
   .head h1 { font-size: 16px; line-height: 1.3; font-weight: 700; }
@@ -600,6 +604,36 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   .bldgbar > .chip { flex: none; white-space: nowrap; }
   .chip { padding: 10px 13px; font-size: 14px; min-height: 44px; }
   .mk { padding: 10px 12px; font-size: 13px; min-height: 44px; }
+
+  /*
+   * --- 地図タブ: 操作するものは地図の「上に積む」のではなく「上に浮かせる」 ---
+   *
+   * 積むと、検索欄と棟のチップだけで画面の 2 割を先に取ってしまい、
+   * 残りに会場を収めるので全体表示が読めない大きさまで縮む。
+   * 浮かせれば地図はタブバーまでの全部を使える。
+   *
+   * 「一番上まで滑らせたら出す」方式は採らなかった。全体表示では地図が
+   * 中央に収まっていてスクロール自体が起きない —— 一番縮んでいて棟を
+   * 選びたいときに限って、出すきっかけが無くなる。
+   */
+  body.app.tab-map .head { display: none; }
+  body.app.tab-map .toolbar,
+  body.app.tab-map .bldgbar {
+    position: absolute; left: 0; right: 0; z-index: 12;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  body.app.tab-map .toolbar {
+    top: calc(8px + env(safe-area-inset-top)); margin: 0 10px;
+    background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  body.app.tab-map .bldgbar { top: calc(66px + env(safe-area-inset-top)); padding: 4px 10px; }
+  /* チップ自体が面を持っているので、帯には背景を敷かない */
+  body.app.tab-map .bldgbar > .chip { box-shadow: var(--shadow); }
+  /* 絞り込みを開いている間は下の列が伸びるので、チップの帯を押し下げる */
+  body.app.tab-map.filters-open .bldgbar { top: calc(122px + env(safe-area-inset-top)); }
+  /* 指で地図を動かしている間は引っ込む。指の下の会場を隠さないため */
+  body.app.tab-map .toolbar.away,
+  body.app.tab-map .bldgbar.away { opacity: .12; transform: translateY(-6px); pointer-events: none; }
 
   /* --- 地図は端まで。操作はつまみが主 --- */
   .mapwrap { position: relative; flex: 1; min-height: 0; }
@@ -1285,6 +1319,8 @@ function render() {
   document.body.classList.toggle('app', onMap || onPlan);
   // プランは地図を低く、一覧を主役にする。高さの配分は CSS 側で決める
   document.body.classList.toggle('tab-plan', onPlan);
+  // 地図タブだけ、検索欄と棟のチップを地図の上に浮かせる
+  document.body.classList.toggle('tab-map', onMap);
 
   renderMap(base);
   renderPlan(onPlan ? list : []);
@@ -1667,6 +1703,22 @@ mapScroll.addEventListener('touchmove', ev => {
 }, { passive: false });
 
 mapScroll.addEventListener('touchend', ev => { if (ev.touches.length < 2) pinch = null; }, { passive: true });
+
+/*
+ * 地図を動かしている間だけ、上に浮かせた検索欄と棟のチップを引っ込める。
+ * 引っかけるのは touchmove —— touchstart にすると、マスを軽く叩いただけでも
+ * 一瞬ちらつく。動かし始めて初めて「今は地図を見ている」と分かる。
+ */
+(() => {
+  const chrome = [document.querySelector('.toolbar'), document.getElementById('bldgbar')].filter(Boolean);
+  const away = (on) => { for (const el of chrome) el.classList.toggle('away', on); };
+  mapScroll.addEventListener('touchmove', () => away(true), { passive: true });
+  for (const ev of ['touchend', 'touchcancel']) {
+    mapScroll.addEventListener(ev, e => { if (!e.touches.length) away(false); }, { passive: true });
+  }
+  // 棟を選び直したときは必ず出ている状態から始める
+  document.getElementById('bldgbar').addEventListener('click', () => away(false));
+})();
 
 /**
  * 素早く 2 回叩いたら拡大、拡大済みなら全体へ戻す。
