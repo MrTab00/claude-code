@@ -159,7 +159,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   font: 600 14.5px var(--sans); cursor: pointer;
   padding: 9px 16px; border-radius: var(--r-pill); min-height: 38px;
 }
-.tab:hover { color: var(--ink); }
 .tab[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); box-shadow: var(--shadow); }
 .tab .n { font: 700 12px var(--mono); font-variant-numeric: tabular-nums; margin-left: 7px; opacity: .8; }
 
@@ -182,7 +181,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
   font: 600 13px var(--sans); cursor: pointer;
 }
-.chip:hover { color: var(--ink); }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .chip[data-value="東"][aria-pressed="true"] { background: var(--east-soft); border-color: var(--east); color: var(--east); }
 .chip[data-value="西"][aria-pressed="true"] { background: var(--west-soft); border-color: var(--west); color: var(--west); }
@@ -390,7 +388,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); color: var(--ink);
   font: inherit; touch-action: manipulation;
 }
-.prow:hover { border-color: var(--accent); }
 .prow .pmark { font-size: 15px; line-height: 1; flex: none; width: 18px; text-align: center; }
 .prow .pmark.must { color: var(--accent); }
 .prow .pmark.like { color: var(--accent); opacity: .65; }
@@ -434,7 +431,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 .who { font-size: 13px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }
 .who strong { color: var(--ink); font-size: 14.5px; font-weight: 600; }
 .who a { color: var(--accent); text-decoration: none; font-family: var(--mono); font-size: 12px; }
-.who a:hover { text-decoration: underline; }
 
 .tags { display: flex; gap: 5px; flex-wrap: wrap; }
 .tag { font-size: 12px; padding: 4px 10px; border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--border); }
@@ -443,7 +439,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 .body { font-size: 13.5px; white-space: pre-wrap; word-break: break-word; max-height: 7.4em; overflow: hidden; }
 .body.open { max-height: none; }
 .more { align-self: flex-start; background: none; border: 0; color: var(--accent); cursor: pointer; font: 500 12.5px var(--sans); padding: 0; }
-.more:hover { text-decoration: underline; }
 
 /*
  * お品書きは配置番号や頒価が画像の中に書かれていることが多い。切り抜くと肝心の文字が
@@ -462,7 +457,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   margin-top: auto; padding-top: 4px; font-size: 12px; color: var(--muted);
 }
 .foot .src { margin-left: auto; color: var(--accent); text-decoration: none; white-space: nowrap; }
-.foot .src:hover { text-decoration: underline; }
 .flag { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: var(--r-pill); background: var(--flag-soft); color: var(--flag); }
 
 #more-sentinel { height: 1px; }
@@ -505,7 +499,6 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 .ltable td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .ltable tr:last-child td { border-bottom: 0; }
 .ltable tbody tr { cursor: pointer; }
-.ltable tbody tr:hover td { background: var(--surface-2); }
 .ltable .b { font-size: 12.5px; padding: 2px 6px; }
 .ltable .st { font-size: 13px; white-space: nowrap; letter-spacing: .1em; }
 .ltable .memo-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
@@ -538,6 +531,78 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 /* --- フッタ(公開向けの断り書き) --- */
 .site-note { font-size: 11.5px; color: var(--muted); line-height: 1.7; border-top: 1px solid var(--border); padding-top: 14px; }
 .site-note a { color: var(--accent); }
+
+/*
+ * ホバーは指のある機器では「触ったところに残る」だけの見た目になる。
+ * ボタンを押したあと色が付いたままになるのがそれ。実際にポインタのある機器に限る。
+ */
+@media (hover: hover) and (pointer: fine) {
+  .tab:hover { color: var(--ink); }
+  .chip:hover { color: var(--ink); }
+  .prow:hover { border-color: var(--accent); }
+  .who a:hover { text-decoration: underline; }
+  .more:hover { text-decoration: underline; }
+  .foot .src:hover { text-decoration: underline; }
+  .ltable tbody tr:hover td { background: var(--surface-2); }
+}
+
+/*
+ * 画面の道具は長押し・二度叩きで文字が選択されないようにする。
+ * 地図のマスを二度叩いて拡大しようとすると、代わりに番号が選択されてしまう。
+ * ツイート本文とサークル名は選べるまま —— 名前をコピーして検索する使い方がある。
+ */
+.tab, .chip, .zbtn, .mk, .langpick, .blk, .sp, .cb, .mhall > .name, .bldg.stray > h4,
+.plansum, .pgroup > h3, .prow .pspace, .ltable th, .stat, .eyebrow, #panel .grab {
+  -webkit-user-select: none; user-select: none;
+}
+
+
+/* --- 最初に出す日選び --- */
+/*
+ * 会場では 1 日目と 2 日目でサークルが総入れ替わりになる。どちらに行くのかが
+ * 決まらないうちは、地図に出ている 3000 個のマスの半分は自分に関係がない。
+ * だから絞り込みの 1 項目ではなく、入ったところで最初に訊く。
+ */
+#daypick {
+  position: fixed; inset: 0; z-index: 80; background: var(--paper);
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px;
+  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+#daypick .dp-head { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+#daypick .dp-lang { display: flex; gap: 5px; }
+#daypick .dp-lang button {
+  appearance: none; cursor: pointer; padding: 8px 14px; min-height: var(--tap);
+  border-radius: var(--r-pill); border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted); font: 600 13px var(--sans);
+}
+#daypick .dp-lang button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#daypick h2 { margin: 0; font: 800 22px/1.3 var(--sans); letter-spacing: -.02em; text-wrap: balance; }
+#daypick .dp-days { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 420px; }
+/* 押す面は大きく。歩きながら片手で押すのが本番 */
+#daypick .dp-day {
+  appearance: none; cursor: pointer; width: 100%; min-height: 88px; text-align: left;
+  display: flex; align-items: center; gap: 14px; padding: 16px 20px;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
+}
+#daypick .dp-day .dp-no {
+  font: 800 30px/1 var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--accent-ink); background: var(--accent);
+  width: 56px; height: 56px; flex: none; border-radius: var(--r-md);
+  display: flex; align-items: center; justify-content: center;
+}
+#daypick .dp-day .dp-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#daypick .dp-day .dp-date { font: 700 17px var(--sans); }
+#daypick .dp-day .dp-n { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+/* 今日がその日なら目立たせる —— 当日に開いたとき、押すべきものが一目で分かる */
+#daypick .dp-day[data-today="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
+#daypick .dp-both {
+  appearance: none; cursor: pointer; min-height: var(--tap); padding: 10px 20px;
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: none; color: var(--muted); font: 600 14px var(--sans);
+}
+#daypick .dp-note { font-size: 12px; color: var(--muted); text-align: center; }
 
 /* --- 印刷: 今の絞り込み・並び順の表だけを出す --- */
 #printtable { display: none; }
@@ -774,6 +839,8 @@ const I18N = {
     'guess.name': '推定', 'guess.name.t': 'サークル名は推定です',
     'guess.char': 'キャラ推定', 'guess.char.t': '本文からの推定です',
     'has.shinagaki': 'お品書きあり', 'dual': 'サークル兼レイヤー', 'posts.merged': '{n} 投稿をまとめて表示',
+    'pick.q': 'どちらの日に行きますか？', 'pick.both': '両日を見る',
+    'pick.n': '{n} サークル', 'pick.note': 'あとから上の絞り込みで変えられます',
     'src.name': '表示名', 'src.bio': 'プロフィール', 'src.account': '別ツイート',
     'note.1': '非公式のファンメイドツールです。コミックマーケット準備会および各サークルとは一切関係ありません。配置・頒布情報は X の投稿から機械的に抽出したもので、正確性は保証されません — 必ず',
     'note.2': '等でご確認ください。画像・本文の権利は各投稿者に帰属します。当ページは X 上の原ツイートを参照表示するだけで保存はしておらず、原ツイートが削除されると表示されなくなります。チェック・メモはお使いのブラウザ内(localStorage)にのみ保存され、どこにも送信されません。',
@@ -823,6 +890,8 @@ const I18N = {
     'guess.name': '推测', 'guess.name.t': '社团名是推测出来的',
     'guess.char': '角色推测', 'guess.char.t': '从正文推测出来的',
     'has.shinagaki': '有品书', 'dual': '社团兼 Coser', 'posts.merged': '合并显示 {n} 条推文',
+    'pick.q': '你哪天去？', 'pick.both': '两天都看',
+    'pick.n': '{n} 个社团', 'pick.note': '之后在上面的筛选里随时能改',
     'src.name': '显示名', 'src.bio': '简介', 'src.account': '同账号其他推文',
     'note.1': '非官方的爱好者工具，与 Comic Market 准备会及各社团没有任何关系。摊位和頒布信息是从 X 的推文里机械提取的，不保证准确 — 请务必以',
     'note.2': '为准。图片和正文的权利属于各发布者。本页只引用 X 上的原推文，不保存任何内容；原推文被删除后就不再显示。勾选和备注只存在你自己的浏览器里(localStorage)，不会发送到任何地方。',
@@ -872,6 +941,8 @@ const I18N = {
     'guess.name': 'guess', 'guess.name.t': 'Circle name is inferred',
     'guess.char': 'character guess', 'guess.char.t': 'Inferred from the post text',
     'has.shinagaki': 'has lineup image', 'dual': 'circle & cosplayer', 'posts.merged': '{n} posts merged',
+    'pick.q': 'Which day are you going?', 'pick.both': 'Show both days',
+    'pick.n': '{n} circles', 'pick.note': 'You can change this later in the filters',
     'src.name': 'display name', 'src.bio': 'bio', 'src.account': 'another post',
     'note.1': 'An unofficial, fan-made tool. Not affiliated with the Comic Market Preparatory Committee or any circle. Placement and release details are extracted mechanically from posts on X and are not guaranteed to be correct — always confirm against',
     'note.2': '. Images and text belong to their posters. This page only references the original posts on X and stores nothing; if a post is deleted it stops showing. Marks and notes live only in your own browser (localStorage) and are never sent anywhere.',
@@ -960,6 +1031,7 @@ function applyLang(next) {
 
   render();
   layoutMapChrome();
+  if (!document.getElementById('daypick').hidden) fillDayPick();
 }
 
 // 公式配置図から起こしたホール構成と、ブロック→ホールの逆引き
@@ -2025,9 +2097,33 @@ document.getElementById('ltable-wrap').addEventListener('click', ev => {
   if (row) openPanel(row.dataset.sn);
 });
 
+/*
+ * 地図のマスは 1 区画が指より小さい —— 全体表示だと数 px しかない。
+ * 44px を確保しろという原則はここでは物理的に守れないので、
+ * 代わりに外したときの救済を置く: 押した点のまわりを少し探して、一番近いマスを開く。
+ * 探す幅は画面上の見た目で決める(倍率が上がるほど、実際の許容は狭くなる)。
+ */
+function nearestSpace(x, y, reach) {
+  let best = null;
+  let bestD = reach * reach;
+  for (const el of document.querySelectorAll('#mapcanvas .sp, #mapcanvas .cb[data-sn]')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width) continue;
+    // 矩形までの距離。中に入っていれば 0
+    const dx = Math.max(r.left - x, 0, x - r.right);
+    const dy = Math.max(r.top - y, 0, y - r.bottom);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = el; }
+  }
+  return best;
+}
+
 document.getElementById('mapcanvas').addEventListener('click', ev => {
-  const sp = ev.target.closest('.sp');
-  if (sp) openPanel(sp.dataset.sn);
+  const hit = ev.target.closest('.sp, .cb[data-sn]');
+  if (hit) { openPanel(hit.dataset.sn); return; }
+  // 空きマスや通路を押したときだけ、近くを拾いにいく
+  const near = nearestSpace(ev.clientX, ev.clientY, 14);
+  if (near) openPanel(near.dataset.sn);
 });
 
 document.getElementById('zoom-in').addEventListener('click', () => zoomAt(zoom * 1.4));
@@ -2201,9 +2297,82 @@ new IntersectionObserver(entries => {
   if (entries.some(e => e.isIntersecting)) appendChunk();
 }, { rootMargin: '600px' }).observe(document.getElementById('more-sentinel'));
 
+/*
+ * --- 最初に日を訊く ---
+ *
+ * 1 日目と 2 日目でサークルは総入れ替わり。決まっていないうちは地図の半分が
+ * 自分に関係のないマスで埋まっている。だから絞り込みの 1 項目ではなく、入り口で訊く。
+ *
+ * 答えは「その日ぶん」だけ覚える。前日に 1 日目を選んだ人が当日に開いて
+ * 1 日目の地図を見せられても困る —— 日が変わったらもう一度訊く。
+ */
+const DAYPICK_KEY = 'c108.day';
+const todayKey = () => new Date().toLocaleDateString('sv');  // sv は YYYY-MM-DD で出る
+
+function savedDayPick() {
+  try {
+    const v = JSON.parse(localStorage.getItem(DAYPICK_KEY) || 'null');
+    return v && v.on === todayKey() ? v : null;
+  } catch { return null; }
+}
+
+function fillDayPick() {
+  const wrap = document.getElementById('dp-days');
+  const today = todayKey();
+  wrap.innerHTML = DATA.event.days.map(d => {
+    const n = DATA.circles.filter(e => entryDays(e).includes(d.day)).length;
+    return '<button class="dp-day" type="button" data-day="' + d.day + '"' +
+      (d.date === today ? ' data-today="true"' : '') + '>' +
+      '<span class="dp-no">' + d.day + '</span>' +
+      '<span class="dp-txt"><span class="dp-date">' + esc(DAY_LABEL[d.day]) + '</span>' +
+      '<span class="dp-n">' + esc(t('pick.n', { n })) + '</span></span></button>';
+  }).join('');
+  for (const b of document.querySelectorAll('#dp-lang button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+  }
+}
+
+function closeDayPick(day) {
+  try { localStorage.setItem(DAYPICK_KEY, JSON.stringify({ on: todayKey(), day: day || 0 })); } catch {}
+  state.days = day ? new Set([day]) : new Set();
+  for (const c of document.querySelectorAll('#day-filter .chip')) {
+    c.setAttribute('aria-pressed', String(Number(c.dataset.value) === day));
+  }
+  document.getElementById('daypick').hidden = true;
+  render();
+  fitZoom();
+}
+
+document.getElementById('dp-days').addEventListener('click', ev => {
+  const b = ev.target.closest('.dp-day');
+  if (b) closeDayPick(Number(b.dataset.day));
+});
+document.getElementById('dp-both').addEventListener('click', () => closeDayPick(0));
+// 日を選ぶ前に言語を選べるようにする。読めない画面で日だけ訊かれても困る
+document.getElementById('dp-lang').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  applyLang(b.dataset.lang);
+  fillDayPick();
+});
+
 initSeen([...DATA.circles, ...DATA.cosplayers]);
 // applyLang が中で render() まで面倒を見る
 applyLang();
+
+const picked = savedDayPick();
+if (picked) {
+  if (picked.day) {
+    state.days = new Set([picked.day]);
+    for (const c of document.querySelectorAll('#day-filter .chip')) {
+      c.setAttribute('aria-pressed', String(Number(c.dataset.value) === picked.day));
+    }
+  }
+  render();
+} else {
+  fillDayPick();
+  document.getElementById('daypick').hidden = false;
+}
 fitZoom();
 
 // 言語を切り替える。地図の倍率は保ったまま、文言だけ入れ替える
@@ -2349,6 +2518,20 @@ export function renderHtml(dataset: Dataset): string {
     原ツイートが削除されると表示されなくなります。
     チェック・メモはお使いのブラウザ内(localStorage)にのみ保存され、どこにも送信されません。</span>
   </footer>
+</div>
+
+<div id="daypick" hidden>
+  <div class="dp-head">
+    <div class="dp-lang" id="dp-lang">
+      <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
+      <button type="button" data-lang="zh" aria-pressed="false">中文</button>
+      <button type="button" data-lang="en" aria-pressed="false">English</button>
+    </div>
+    <h2 data-i18n="pick.q">どちらの日に行きますか？</h2>
+  </div>
+  <div class="dp-days" id="dp-days"></div>
+  <button class="dp-both" type="button" id="dp-both" data-i18n="pick.both">両日を見る</button>
+  <p class="dp-note" data-i18n="pick.note">あとから上の絞り込みで変えられます</p>
 </div>
 
 <aside id="panel" hidden>

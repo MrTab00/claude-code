@@ -58,6 +58,33 @@ try {
             return getComputedStyle(el).display !== 'none' && r.width > 0 && r.height > 0;
         })()`);
 
+    /*
+     * 入り口で日を訊く。1 日目と 2 日目でサークルは総入れ替わりなので、
+     * 決まらないうちは地図の半分が自分に関係のないマスで埋まっている。
+     */
+    check('最初に日選びが出る', await shown('#daypick'));
+    check('日は event.days のぶんだけ並ぶ', await page.evaluate<boolean>(
+        'document.querySelectorAll("#daypick .dp-day").length === DATA.event.days.length'));
+    check('日選びの押し所は 44px 以上', await page.evaluate<boolean>(
+        '[...document.querySelectorAll("#daypick button")].every(b => b.getBoundingClientRect().height >= 44)'));
+    check('日ごとのサークル数が出ている', await page.evaluate<boolean>(
+        '/\\d/.test(document.querySelector("#daypick .dp-n").textContent)'));
+    // 読めない言語で日だけ訊かれても困るので、ここでも言語を選べる
+    check('日選びに言語の切り替えがある', await shown('#daypick #dp-lang'));
+
+    await page.evaluate(`document.querySelector('#daypick .dp-day[data-day="1"]').click()`);
+    await new Promise((r) => setTimeout(r, 350));
+    check('選ぶと日選びが閉じる', !(await shown('#daypick')));
+    check('選んだ日が絞り込みに入る', await page.evaluate<boolean>(
+        `state.days.size === 1 && state.days.has(1) &&
+         document.querySelector('#day-filter .chip[data-value="1"]').getAttribute('aria-pressed') === 'true'`));
+    // 同じ日のうちは訊き直さない。日が変わったらまた訊く
+    check('選んだ日を今日ぶんとして覚える', await page.evaluate<boolean>(
+        `(() => { const v = JSON.parse(localStorage.getItem('c108.day'));
+                  return v.day === 1 && v.on === new Date().toLocaleDateString('sv'); })()`));
+    await page.evaluate('closeDayPick(0)'); // 以降の検査は両日で見る
+    await new Promise((r) => setTimeout(r, 300));
+
     // 既定は地図タブ。一覧を読むより先に「どこにいるか」が見えるべき
     check('最初に地図が出ている', await shown('#mapwrap'));
     check('地図タブが選ばれている', (await page.evaluate<string>('state.tab')) === 'map');
@@ -84,6 +111,34 @@ try {
         if (!h || !f) return false;
         return Math.abs(h.getBoundingClientRect().height * 2 - f.getBoundingClientRect().height) < 1.5;
     })()`));
+    /*
+     * マスは指より小さい。44px を確保しろという原則をここで守るのは物理的に無理なので、
+     * 外したときに近くのマスを拾う。これが効かないと、拡大しないと何も押せない地図になる。
+     */
+    check('マスを少し外して押しても開く', await page.evaluate<boolean>(`(() => {
+        closePanel();
+        applyZoom(1);
+        const el = document.querySelector('#mapcanvas .sp');
+        const r = el.getBoundingClientRect();
+        // マスのすぐ外(通路側)を押す
+        document.getElementById('mapcanvas').dispatchEvent(new MouseEvent('click', {
+            bubbles: true, clientX: r.right + 6, clientY: r.top + r.height / 2,
+        }));
+        const open = !document.getElementById('panel').hidden;
+        closePanel();
+        return open;
+    })()`));
+    check('遠くを押しても開かない', await page.evaluate<boolean>(`(() => {
+        const el = document.querySelector('#mapcanvas .sp');
+        const r = el.getBoundingClientRect();
+        document.getElementById('mapcanvas').dispatchEvent(new MouseEvent('click', {
+            bubbles: true, clientX: r.right + 60, clientY: r.top + r.height / 2,
+        }));
+        const open = !document.getElementById('panel').hidden;
+        closePanel();
+        return !open;
+    })()`));
+
     // a は番号が増えていく側から先。右列は下から上へ、左列は上から下へ数える
     check('a と b の上下が列の数え方に従う', await page.evaluate<boolean>(`(() => {
         const pair = {};
