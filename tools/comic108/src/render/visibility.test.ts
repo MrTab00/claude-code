@@ -68,6 +68,34 @@ try {
         return Math.abs(sizer.height - canvas.height) < 4 && Math.abs(sizer.width - canvas.width) < 4;
     })()`));
     check('地図の島が描かれている', (await page.evaluate<number>('document.querySelectorAll(".island").length')) === 115);
+
+    /*
+     * 1 つの番号は a・b の 2 スペース。番号だけで束ねると、隣り合う 2 サークルの片方が
+     * 地図から消える。fixture には 東A-12b(片側)・西け21a(片側)・ア-12ab(両取り) が入っている。
+     */
+    check('片側だけのサークルは半区画で描く', await page.evaluate<boolean>(
+        'document.querySelectorAll(".sp[data-half]").length > 0'));
+    check('ab を取っているサークルは 1 区画まるごと', await page.evaluate<boolean>(
+        `[...document.querySelectorAll('.sp:not([data-half])')].some(e => /ab$/.test(e.querySelector('.num').textContent))`));
+    check('半区画はまるごとの半分の高さ', await page.evaluate<boolean>(`(() => {
+        applyZoom(1);
+        const h = document.querySelector('.sp[data-half]');
+        const f = document.querySelector('.sp:not([data-half])');
+        if (!h || !f) return false;
+        return Math.abs(h.getBoundingClientRect().height * 2 - f.getBoundingClientRect().height) < 1.5;
+    })()`));
+    // a は番号が増えていく側から先。右列は下から上へ、左列は上から下へ数える
+    check('a と b の上下が列の数え方に従う', await page.evaluate<boolean>(`(() => {
+        const pair = {};
+        for (const e of document.querySelectorAll('.sp[data-half]')) {
+            const k = (e.closest('.island').querySelector('.blk') || {}).textContent + '|' +
+                      e.style.gridColumn + '|' + e.style.gridRow + '|' +
+                      [...e.closest('.island').children].indexOf(e.closest('.bandslot'));
+            (pair[k] = pair[k] || {})[e.dataset.half] = e.getBoundingClientRect().top;
+        }
+        return Object.entries(pair).filter(([, v]) => v.a !== undefined && v.b !== undefined)
+            .every(([k, v]) => (k.split('|')[1] === '1') === (v.a < v.b));
+    })()`));
     check('初期状態で詳細パネルは出ていない', !(await shown('#panel')));
     check('初期状態で背景の覆いは出ていない', !(await shown('#backdrop')));
     check('初期状態でカードは出ていない(地図が主役)', !(await shown('#grid')));
@@ -163,6 +191,15 @@ try {
     await page.evaluate(`document.getElementById('filter-toggle').click()`);
     await new Promise((r) => setTimeout(r, 250));
     check('押すとチップが出る', await shown('#day-filter'));
+    /*
+     * 開くと検索欄は 3 段に伸びる。棟の帯を決め打ちの高さに置くと、そこに重なる。
+     * 訳語の長さでも折り返しの数は変わるので、実測で置いているかをここで見る。
+     */
+    check('絞り込みを開いても棟の帯と重ならない', await page.evaluate<boolean>(`(() => {
+        const tb = document.querySelector('.toolbar').getBoundingClientRect();
+        const bb = document.getElementById('bldgbar').getBoundingClientRect();
+        return bb.top >= tb.bottom - 1;
+    })()`));
     await page.evaluate(`document.getElementById('filter-toggle').click()`);
     await new Promise((r) => setTimeout(r, 250));
 

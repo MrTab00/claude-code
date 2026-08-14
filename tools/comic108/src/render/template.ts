@@ -224,7 +224,12 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
 .mapsizer { position: relative; margin: auto; }
 /* 会場の見取り図 1 枚ぶん。棟を真上から見た並びのまま置く */
 .mapcanvas {
-  --sw: 26px; --sh: 8px;
+  /*
+   * --sh は 1 番号ぶんの高さ。a・b に割ると半分になるので、字が入るだけの高さが要る。
+   * 地図の表示倍率は横幅で決まっていて、縦は 6〜9 割余っている —— 縦に伸ばしても
+   * 全体表示は小さくならない。
+   */
+  --sw: 26px; --sh: 12px;
   position: absolute; top: 0; left: 0;
   transform-origin: 0 0; padding: 22px; width: max-content;
   display: flex; flex-direction: column; gap: 34px;
@@ -329,6 +334,14 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
   font: 600 7px/1 var(--sans); display: flex; align-items: center; white-space: nowrap;
   outline: 1px solid var(--accent); touch-action: manipulation;
 }
+/*
+ * 1 つの番号は a・b の 2 スペース。片方だけのサークルは升目の半分を占める。
+ * data-first は、番号が増えていく側 —— 右列は下から上へ、左列は上から下へ数えるので、
+ * 同じ「a」でも列によって上下が入れ替わる。
+ */
+.sp[data-half] { height: 50%; font-size: 5.5px; }
+.sp[data-first="start"] { align-self: start; }
+.sp[data-first="end"] { align-self: end; }
 .sp[data-area="東"] { background: var(--east-soft); color: var(--east); outline-color: var(--east); }
 .sp[data-area="西"] { background: var(--west-soft); color: var(--west); outline-color: var(--west); }
 .sp[data-area="南"] { background: var(--south-soft); color: var(--south); outline-color: var(--south); }
@@ -638,11 +651,14 @@ button, .chip, .tab, .prow { transition: transform .08s ease, background-color .
     top: calc(8px + env(safe-area-inset-top)); margin: 0 10px;
     background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   }
-  body.app.tab-map .bldgbar { top: calc(66px + env(safe-area-inset-top)); padding: 4px 10px; }
+  /*
+   * 棟の帯は検索欄の真下。高さを決め打ちにすると、絞り込みを開いて検索欄が
+   * 3 段に伸びたときに重なる —— 文字の長さは言語でも変わるので、CSS では追えない。
+   * 実際の高さを測って layoutMapChrome() が --bldgbar-top に入れる。
+   */
+  body.app.tab-map .bldgbar { top: var(--bldgbar-top, 66px); padding: 4px 10px; }
   /* チップ自体が面を持っているので、帯には背景を敷かない */
   body.app.tab-map .bldgbar > .chip { box-shadow: var(--shadow); }
-  /* 絞り込みを開いている間は下の列が伸びるので、チップの帯を押し下げる */
-  body.app.tab-map.filters-open .bldgbar { top: calc(122px + env(safe-area-inset-top)); }
   /* 指で地図を動かしている間は引っ込む。指の下の会場を隠さないため */
   body.app.tab-map .toolbar.away,
   body.app.tab-map .bldgbar.away { opacity: .12; transform: translateY(-6px); pointer-events: none; }
@@ -943,6 +959,7 @@ function applyLang(next) {
   if (sel) sel.value = lang;
 
   render();
+  layoutMapChrome();
 }
 
 // 公式配置図から起こしたホール構成と、ブロック→ホールの逆引き
@@ -1221,8 +1238,18 @@ function rowsFor(kind) {
  * ブロック記号からホールと表記を引き直すので、ツイートにホール番号が無くても、
  * 大文字小文字が揺れていても、正しいマスに入る。
  */
+/**
+ * 配置を地図の升目に割り当てる。
+ *
+ * 1 つの番号は a・b の 2 スペースに分かれている。「ア-19a」と「ア-19b」は別のサークルで、
+ * 「ア-19ab」は 1 つのサークルが両方を取っている状態。番号だけで束ねると、隣り合う
+ * 2 サークルの片方が消える。ここでは半区画ごとに持つ。
+ *
+ * a か b か分からない配置(「東A-12」までしか書いていないツイート)は、どちらとも
+ * 断定できないので両方に入れる —— 見せないより、幅いっぱいで「このあたり」と出すほうがいい。
+ */
 function buildSpaceIndex(rows) {
-  const spaces = new Map(); // "地区/ホール/ブロック/番号" -> 項目[]
+  const spaces = new Map();  // 同人: "地区/ホール/ブロック/番号" -> {a: 項目[], b: 項目[]} / 企業: 項目[]
   const strays = new Map();
   for (const e of rows) {
     for (const b of e.booths || []) {
@@ -1231,12 +1258,22 @@ function buildSpaceIndex(rows) {
         if (b.block && b.area) strays.set(b.area + '/' + b.block, (strays.get(b.area + '/' + b.block) || 0) + 1);
         continue;
       }
-      const key = o.company
-        ? 'C/' + o.area + '/' + o.hall + '/' + o.company
-        : o.area + '/' + o.hall + '/' + o.block + '/' + (b.number ?? 0);
-      if (!spaces.has(key)) spaces.set(key, []);
-      const at = spaces.get(key);
-      if (!at.some(x => x.screenName === e.screenName)) at.push(e);
+      if (o.company) {
+        const key = 'C/' + o.area + '/' + o.hall + '/' + o.company;
+        if (!spaces.has(key)) spaces.set(key, []);
+        const at = spaces.get(key);
+        if (!at.some(x => x.screenName === e.screenName)) at.push(e);
+        continue;
+      }
+      const key = o.area + '/' + o.hall + '/' + o.block + '/' + (b.number ?? 0);
+      if (!spaces.has(key)) spaces.set(key, { a: [], b: [], both: false });
+      const cell = spaces.get(key);
+      // 「ab」と書いてあったのか、a/b が書かれていなかったのかは区別して覚えておく
+      if (b.ab === 'ab') cell.both = true;
+      // どちらの側か決まらないものは両側に置く
+      for (const h of (b.ab === 'a' || b.ab === 'b') ? [b.ab] : ['a', 'b']) {
+        if (!cell[h].some(x => x.screenName === e.screenName)) cell[h].push(e);
+      }
     }
   }
   return { spaces, strays };
@@ -1296,17 +1333,32 @@ function islandHtml(area, hallNo, island, slots, letterAfter, spaces, isWall) {
 
   const cells = bands.map(() => '');
   for (let n = 1; n <= total; n++) {
-    const at = spaces.get(key(n));
-    if (!at || !at.length) continue;
+    const cell = spaces.get(key(n));
+    if (!cell) continue;
     const p = spacePos(n, bands);
     if (!p) continue;
-    const names = at.map(e => e.circleName || e.displayName);
-    const mark = markOf(at[0].screenName).s;
-    cells[p.band] += '<button class="sp" type="button" data-area="' + esc(area) + '"' +
-      (mark ? ' data-mark="' + mark + '"' : '') +
-      ' data-sn="' + esc(at[0].screenName) + '" style="grid-column:' + p.col + ';grid-row:' + p.row + '"' +
-      ' title="' + esc(area + hallNo + ' ' + block + '-' + String(n).padStart(2, '0') + '  ' + names.join(' / ')) + '">' +
-      '<span class="num">' + n + '</span><span class="nm">' + esc(names.join('/')) + '</span></button>';
+
+    const same = cell.a.length === cell.b.length &&
+                 cell.a.every((x, i) => cell.b[i] && x.screenName === cell.b[i].screenName);
+    // a と b が同じ = ab を取っているか、a/b が分からない。1 区画まるごとで描く
+    const halves = same ? [['', cell.a]] : [['a', cell.a], ['b', cell.b]];
+
+    for (const [h, at] of halves) {
+      if (!at.length) continue;
+      const names = at.map(e => e.circleName || e.displayName);
+      const mark = markOf(at[0].screenName).s;
+      // 「ab」と分かっているものだけ ab と出す。書かれていなかったものは番号だけ
+      const label = block + '-' + String(n).padStart(2, '0') + (h || (cell.both ? 'ab' : ''));
+      cells[p.band] += '<button class="sp" type="button" data-area="' + esc(area) + '"' +
+        (mark ? ' data-mark="' + mark + '"' : '') +
+        (h ? ' data-half="' + h + '"' : '') +
+        // a は番号が増えていく側から先。右列は下から上へ、左列は上から下へ数える
+        (h ? ' data-first="' + (p.col === 2 ? (h === 'a' ? 'end' : 'start') : (h === 'a' ? 'start' : 'end')) + '"' : '') +
+        ' data-sn="' + esc(at[0].screenName) + '" style="grid-column:' + p.col + ';grid-row:' + p.row + '"' +
+        ' title="' + esc(area + hallNo + ' ' + label + '  ' + names.join(' / ')) + '">' +
+        '<span class="num">' + n + (h || (cell.both ? 'ab' : '')) + '</span>' +
+        '<span class="nm">' + esc(names.join('/')) + '</span></button>';
+    }
   }
 
   // ブロック記号は配置図と同じく通路の切れ目に置く。壁は帯が 1 本なので先頭
@@ -1814,9 +1866,23 @@ document.querySelector('.tabs').addEventListener('click', ev => {
   if (state.tab === 'map' || state.tab === 'plan') fitZoom();
 });
 
+/**
+ * 地図の上に浮かせた 2 段(検索欄・棟の帯)の縦位置を合わせる。
+ *
+ * 検索欄の高さは、絞り込みの開閉でも表示言語でも変わる(訳語の長さで折り返しの数が変わる)。
+ * 決め打ちの数値では追えないので、描いたあとの実寸から決める。
+ */
+function layoutMapChrome() {
+  const tb = document.querySelector('.toolbar');
+  if (!tb) return;
+  // .toolbar と .bldgbar はどちらも .wrap を基準に浮いているので、offsetTop がそのまま使える
+  document.body.style.setProperty('--bldgbar-top', (tb.offsetTop + tb.offsetHeight + 6) + 'px');
+}
+
 document.getElementById('filter-toggle').addEventListener('click', ev => {
   const open = document.body.classList.toggle('filters-open');
   ev.currentTarget.setAttribute('aria-expanded', String(open));
+  layoutMapChrome();
 });
 
 document.getElementById('q').addEventListener('input', ev => {
@@ -2149,7 +2215,10 @@ document.getElementById('lang').addEventListener('change', ev => {
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(() => { if (state.tab === 'map' || state.tab === 'plan') fitZoom(); });
 }
-addEventListener('resize', () => { if (state.tab === 'map' || state.tab === 'plan') fitZoom(); });
+addEventListener('resize', () => {
+  layoutMapChrome();
+  if (state.tab === 'map' || state.tab === 'plan') fitZoom();
+});
 `;
 
 export function renderHtml(dataset: Dataset): string {
